@@ -36,7 +36,7 @@
 
 | ドキュメント | 内容 |
 |--------------|------|
-| [design/01-ui-design-guidelines.md](design/01-ui-design-guidelines.md) | UIデザインガイドライン（色・フォント・コンポーネント） |
+| [design/01-ui-design-guidelines.md](design/01-ui-design-guidelines.md) | UIデザインガイドライン（Tonal 参照スクショ・トンマナ・HIG・トークン・コンポーネント） |
 
 ---
 

@@ -1,118 +1,130 @@
 import Link from "next/link";
-import { ChevronRight, Camera, Plus, Video } from "lucide-react";
+import { Settings, Video, TrendingUp } from "lucide-react";
 import { MOCK_VIDEOS } from "@/lib/mocks/videos";
-import { MOCK_WORKOUTS, MOCK_WORKOUT_VIDEOS } from "@/lib/mocks/workouts";
-import { formatDate } from "@/lib/utils/formatDate";
-import { BodyChart } from "@/components/dashboard/BodyChart";
-import { BodyInput } from "@/components/dashboard/BodyInput";
+import { MOCK_WORKOUT_HISTORY } from "@/lib/mocks/workoutHistory";
+import { MOCK_BODY_LOGS } from "@/lib/mocks/bodyLogs";
+import { formatJapaneseLongDate } from "@/lib/utils/formatRecordDate";
 
 export default function DashboardPage() {
-  const thisWeek = MOCK_WORKOUTS.filter((w) => {
-    const d = new Date(w.log_date);
-    const now = new Date();
-    const diff = (now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24);
-    return diff <= 7;
-  });
-
-  const latest = MOCK_WORKOUTS[0];
+  const weekSessions = MOCK_WORKOUT_HISTORY.length;
+  const videoCount = MOCK_VIDEOS.length;
+  const latestWeight = MOCK_BODY_LOGS[MOCK_BODY_LOGS.length - 1];
+  const latestWorkout = MOCK_WORKOUT_HISTORY[0];
 
   return (
     <div className="space-y-8">
-      <header>
-        <h1 className="text-xl font-title">FormCheck</h1>
+      {/* Top bar: 小さめの「FormCheck」+ 右上に設定アイコン */}
+      <header className="flex items-center justify-between">
+        <div>
+          <p className="text-[11px] font-caption uppercase tracking-[0.12em] text-muted">
+            FormCheck
+          </p>
+          <h1 className="mt-0.5 text-[22px] font-bold tracking-tight">今日もいこう</h1>
+        </div>
+        <Link
+          href="/settings"
+          className="flex h-10 w-10 items-center justify-center rounded-full text-secondary transition-all duration-150 active:bg-chip active:scale-95"
+          aria-label="設定"
+        >
+          <Settings size={20} strokeWidth={1.75} />
+        </Link>
       </header>
 
-      {/* Quick actions */}
-      <div className="grid grid-cols-2 gap-3">
-        <Link
-          href="/capture"
-          className="flex items-center gap-3 rounded-xl bg-accent px-4 py-3.5 transition-all active:scale-[0.98]"
-        >
-          <Camera size={18} strokeWidth={1.5} className="text-primary" />
-          <div>
-            <p className="text-sm font-title text-primary">撮影して記録</p>
-            <p className="text-[10px] text-primary/60">フォームチェック</p>
-          </div>
-        </Link>
-        <Link
-          href="/workouts/new"
-          className="flex items-center gap-3 rounded-xl bg-surface px-4 py-3.5 transition-all active:scale-[0.98]"
-        >
-          <Plus size={18} strokeWidth={1.5} className="text-secondary" />
-          <div>
-            <p className="text-sm font-title">さっと記録</p>
-            <p className="text-[10px] text-muted">動画なし</p>
-          </div>
-        </Link>
-      </div>
-
-      {/* Stats */}
-      <section className="grid grid-cols-3 gap-3 text-center">
-        <div className="rounded-xl bg-surface px-3 py-4">
-          <p className="text-lg font-metric">{thisWeek.length}</p>
-          <p className="mt-1 text-[10px] font-caption text-muted">今週の記録</p>
-        </div>
-        <div className="rounded-xl bg-surface px-3 py-4">
-          <p className="truncate text-lg font-metric">{latest?.exercise_type ?? "—"}</p>
-          <p className="mt-1 text-[10px] font-caption text-muted">直近の種目</p>
-        </div>
-        <div className="rounded-xl bg-surface px-3 py-4">
-          <p className="text-lg font-metric">{MOCK_VIDEOS.length}</p>
-          <p className="mt-1 text-[10px] font-caption text-muted">動画本数</p>
-        </div>
+      {/* 概況サマリー */}
+      <section className="grid grid-cols-3 gap-2.5">
+        <StatCard value={weekSessions} unit="回" label="今週のセッション" />
+        <StatCard value={videoCount} unit="本" label="撮影した動画" />
+        <StatCard
+          value={latestWeight?.weight ?? "—"}
+          unit="kg"
+          label="最新の体重"
+          sub={latestWeight ? formatJapaneseLongDate(latestWeight.log_date) : undefined}
+        />
       </section>
 
-      <BodyInput />
-
-      <BodyChart />
-
-      {/* Recent activity — unified */}
-      {MOCK_WORKOUTS.length > 0 && (
+      {/* 最近のワークアウト */}
+      {latestWorkout && (
         <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xs font-title uppercase tracking-wider text-muted">最近のセッション</h2>
-            <Link href="/workouts" className="text-[11px] font-label text-secondary">
-              すべて見る
+          <div className="flex items-center justify-between px-0.5">
+            <h2 className="text-[13px] font-bold tracking-tight text-secondary">
+              最近のワークアウト
+            </h2>
+            <Link
+              href="/workouts"
+              className="text-[12px] font-semibold text-muted transition-colors active:text-primary"
+            >
+              すべて見る →
             </Link>
           </div>
-          <div className="divide-y divide-border rounded-xl bg-surface">
-            {MOCK_WORKOUTS.slice(0, 4).map((w) => {
-              const videoIds = MOCK_WORKOUT_VIDEOS[w.id] ?? [];
-              const hasVideo = videoIds.length > 0;
-              return (
-                <Link
-                  key={w.id}
-                  href={`/workouts/${w.id}`}
-                  className="flex items-center gap-3 px-4 py-3 transition-colors active:bg-white/60"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
-                      <p className="truncate text-sm font-title">{w.exercise_type}</p>
-                      {hasVideo && <Video size={11} strokeWidth={1.5} className="shrink-0 text-muted" />}
-                    </div>
-                    <p className="mt-0.5 text-[11px] text-muted">
-                      {w.weight != null && `${w.weight}kg`}
-                      {w.reps != null && ` × ${w.reps}回`}
-                      {w.sets != null && ` × ${w.sets}セット`}
-                    </p>
-                  </div>
-                  <span className="shrink-0 text-[11px] text-muted">{formatDate(w.log_date)}</span>
-                </Link>
-              );
-            })}
-          </div>
+          <Link
+            href="/workouts"
+            className="block overflow-hidden rounded-2xl bg-white shadow-[0_0_0_1px_rgba(0,0,0,.04)] transition-all duration-150 active:scale-[0.99]"
+          >
+            <div className="flex items-center gap-3 p-4">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-chip">
+                <TrendingUp size={18} strokeWidth={1.75} className="text-primary" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[14px] font-bold">{latestWorkout.title}</p>
+                <p className="mt-0.5 text-[11px] text-secondary">
+                  {formatJapaneseLongDate(latestWorkout.date)} · {latestWorkout.durationMin}分 ·{" "}
+                  {latestWorkout.totalSets}セット
+                </p>
+              </div>
+              <span className="text-muted">›</span>
+            </div>
+          </Link>
         </section>
       )}
 
-      <section className="divide-y divide-border">
+      {/* クイックアクセス（フッターで賄えない導線） */}
+      <section className="space-y-3">
+        <h2 className="px-0.5 text-[13px] font-bold tracking-tight text-secondary">
+          動画
+        </h2>
         <Link
           href="/videos"
-          className="flex items-center justify-between py-3.5 transition-colors active:bg-surface"
+          className="flex items-center gap-3 rounded-2xl bg-white p-4 shadow-[0_0_0_1px_rgba(0,0,0,.04)] transition-all duration-150 active:scale-[0.99]"
         >
-          <span className="text-sm font-label">動画一覧</span>
-          <ChevronRight size={16} className="text-muted" />
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-chip">
+            <Video size={18} strokeWidth={1.75} className="text-primary" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-[14px] font-bold">動画ライブラリ</p>
+            <p className="mt-0.5 text-[11px] text-secondary">
+              撮影したフォームチェック動画
+            </p>
+          </div>
+          <span className="text-muted">›</span>
         </Link>
       </section>
+    </div>
+  );
+}
+
+function StatCard({
+  value,
+  unit,
+  label,
+  sub,
+}: {
+  value: number | string;
+  unit: string;
+  label: string;
+  sub?: string;
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center rounded-2xl bg-white px-2 py-4 shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
+      <p className="flex items-baseline gap-0.5">
+        <span className="text-[22px] font-metric leading-none">{value}</span>
+        <span className="text-[10px] font-caption text-muted">{unit}</span>
+      </p>
+      <p className="mt-1.5 text-center text-[10px] font-caption leading-tight text-secondary">
+        {label}
+      </p>
+      {sub && (
+        <p className="mt-1 line-clamp-2 text-center text-[9px] leading-tight text-muted">{sub}</p>
+      )}
     </div>
   );
 }

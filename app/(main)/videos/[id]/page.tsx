@@ -8,6 +8,7 @@ import {
   Pencil, Layers, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { MOCK_VIDEOS } from "@/lib/mocks/videos";
+import { getWorkoutSessionById } from "@/lib/mocks/workoutHistory";
 import { VideoOverlay } from "@/components/player/VideoOverlay";
 import { DrawingCanvas, type DrawTool, type DrawShape } from "@/components/player/DrawingCanvas";
 import { OverlayControls } from "@/components/player/OverlayControls";
@@ -37,7 +38,7 @@ export default function VideoDetailPage() {
   const [overlayOpacity, setOverlayOpacity] = useState(0.3);
 
   const [drawTool, setDrawTool] = useState<DrawTool>("none");
-  const [drawColor, setDrawColor] = useState("#DCFC67");
+  const [drawColor, setDrawColor] = useState("#3eed8d");
   const [shapes, setShapes] = useState<DrawShape[]>([]);
 
   const [panel, setPanel] = useState<Panel>(null);
@@ -128,6 +129,8 @@ export default function VideoDetailPage() {
     );
   }
 
+  const linkedSession = getWorkoutSessionById(video.workout_session_id);
+
   return (
     <div className="-mx-6 -mt-12 flex flex-col" style={{ height: "calc(100dvh - 56px)" }}>
       {/* Header — 動画の外に独立配置 */}
@@ -138,6 +141,14 @@ export default function VideoDetailPage() {
           </button>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-title text-white">{video.title}</p>
+            {linkedSession && (
+              <Link
+                href={`/videos?session=${video.workout_session_id}`}
+                className="mt-1 inline-block truncate text-[11px] font-semibold text-white/55 underline-offset-2 hover:text-white/90"
+              >
+                ワークアウト: {linkedSession.title}
+              </Link>
+            )}
           </div>
           <span className="shrink-0 rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-label text-white/60">
             {video.exercise_type}
@@ -196,17 +207,17 @@ export default function VideoDetailPage() {
 
         {/* Playback */}
         <div className="flex items-center justify-center gap-4">
-          <button type="button" onClick={() => skip(-5)} className="p-2 text-secondary transition-colors active:text-primary">
+          <button type="button" onClick={() => skip(-5)} className="flex min-h-[44px] min-w-[44px] items-center justify-center text-secondary transition-colors active:text-primary">
             <SkipBack size={18} strokeWidth={1.5} />
           </button>
           <button
             type="button"
             onClick={togglePlay}
-            className="flex h-11 w-11 items-center justify-center rounded-full bg-accent transition-all active:scale-95"
+            className="flex h-11 w-11 items-center justify-center rounded-full bg-inverse transition-all active:scale-95"
           >
-            {playing ? <Pause size={18} className="text-primary" /> : <Play size={18} className="ml-0.5 text-primary" />}
+            {playing ? <Pause size={18} className="text-on-inverse" /> : <Play size={18} className="ml-0.5 text-on-inverse" />}
           </button>
-          <button type="button" onClick={() => skip(5)} className="p-2 text-secondary transition-colors active:text-primary">
+          <button type="button" onClick={() => skip(5)} className="flex min-h-[44px] min-w-[44px] items-center justify-center text-secondary transition-colors active:text-primary">
             <SkipForward size={18} strokeWidth={1.5} />
           </button>
 
@@ -316,12 +327,12 @@ export default function VideoDetailPage() {
               onChange={(e) => setMemo(e.target.value)}
               rows={3}
               placeholder="フォームの気づきなど"
-              className="w-full rounded-xl border-0 bg-surface px-4 py-3 text-sm text-primary placeholder:text-muted/60 focus:outline-none focus:ring-2 focus:ring-accent/40"
+              className="w-full rounded-lg border border-border bg-white px-4 py-3 text-sm text-primary placeholder:text-muted/60 focus:outline-none focus:ring-2 focus:ring-primary/10"
             />
             <button
               type="button"
               onClick={handleMemoSave}
-              className="h-9 w-full rounded-lg bg-accent text-xs font-title text-primary transition-all active:scale-[0.98]"
+              className="min-h-[44px] w-full rounded-xl bg-inverse text-sm font-extrabold tracking-wide text-on-inverse transition-colors duration-150 active:scale-[0.98]"
             >
               保存
             </button>

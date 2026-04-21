@@ -10,7 +10,7 @@ const GRID_OPTIONS: { type: GridType; icon: typeof Grid3x3; label: string }[] = 
   { type: "center_h", icon: MoveHorizontal, label: "横中心" },
 ];
 
-const COLORS = ["#FFFFFF", "#DCFC67", "#EF4444", "#3B82F6"];
+const COLORS = ["#FFFFFF", "#3eed8d", "#EF4444", "#3B82F6"];
 
 interface Props {
   activeGrids: Set<GridType>;
@@ -30,7 +30,7 @@ export function OverlayControls({
   opacity, onOpacityChange,
 }: Props) {
   return (
-    <div className="space-y-3 rounded-xl bg-surface p-3">
+    <div className="space-y-3 rounded-lg bg-surface p-3">
       <div className="flex items-center gap-1">
         {GRID_OPTIONS.map(({ type, icon: Icon, label }) => (
           <button

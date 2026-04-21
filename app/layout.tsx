@@ -1,11 +1,18 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Noto_Sans_JP } from "next/font/google";
 import "./globals.css";
 
 const inter = Inter({
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600"],
+  weight: ["300", "400", "500", "600", "700", "800"],
   variable: "--font-inter",
+  display: "swap",
+});
+
+const notoSansJP = Noto_Sans_JP({
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700", "800"],
+  variable: "--font-noto",
   display: "swap",
 });
 
@@ -23,8 +30,10 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ja" className={inter.variable}>
-      <body className={`${inter.className} flex min-h-dvh flex-col font-sans`}>{children}</body>
+    <html lang="ja" className={`${inter.variable} ${notoSansJP.variable}`}>
+      <body className={`${inter.className} flex min-h-dvh flex-col font-sans`}>
+        {children}
+      </body>
     </html>
   );
 }

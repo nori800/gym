@@ -1,8 +1,5 @@
 import type { Config } from "tailwindcss";
 
-/**
- * Design tokens — docs/design/01-ui-design-guidelines.md と同期すること
- */
 const config: Config = {
   content: [
     "./app/**/*.{ts,tsx}",
@@ -14,21 +11,32 @@ const config: Config = {
     extend: {
       colors: {
         app: "#FFFFFF",
-        surface: "#F5F5F7",
-        accent: "#DCFC67",
+        surface: "#f3f3f3",
+        accent: "#3eed8d",
+        inverse: "#000000",
+        "on-inverse": "#FFFFFF",
+        "ios-toggle": "#34C759",
         danger: "#EF4444",
-        border: "#EBEBEB",
-        primary: "#1A1A1A",
-        secondary: "#6B6B6B",
-        muted: "#B0B0B0",
+        border: "#ededed",
+        primary: "#101010",
+        secondary: "#7a7a7a",
+        muted: "#9a9a9a",
+        chip: "#ececec",
         chart: {
-          line: "#DCFC67",
-          fill: "rgba(220, 252, 103, 0.12)",
+          line: "#1A1A1A",
+          fill: "rgba(0, 0, 0, 0.06)",
           neutral: "#D4D4D4",
         },
       },
       fontFamily: {
-        sans: ["var(--font-inter)", "Inter", "Helvetica Neue", "Arial", "sans-serif"],
+        sans: [
+          "var(--font-inter)",
+          "var(--font-noto)",
+          "Inter",
+          "Helvetica Neue",
+          "Arial",
+          "sans-serif",
+        ],
       },
       fontWeight: {
         caption: "300",

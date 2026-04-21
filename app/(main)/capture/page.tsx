@@ -4,6 +4,7 @@ import { useRef, useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Grid3x3, Upload, X, Camera, CircleStop } from "lucide-react";
 import { GridOverlay } from "@/components/capture/GridOverlay";
+import { PrimaryRecordButton } from "@/components/common/PrimaryRecordButton";
 
 type CaptureState = "idle" | "previewing" | "recording" | "recorded";
 
@@ -116,20 +117,21 @@ export default function CapturePage() {
 
   if (error === "camera") {
     return (
-      <div className="-mx-6 -mt-12 flex flex-col items-center justify-center px-8 text-center" style={{ height: "calc(100dvh - 56px)" }}>
+      <div
+        className="-mx-6 -mt-12 flex flex-col items-center justify-center px-8 text-center"
+        style={{ height: "calc(100dvh - 56px)" }}
+      >
         <Camera size={40} strokeWidth={1} className="mb-4 text-muted" />
         <p className="text-sm font-title">カメラにアクセスできません</p>
         <p className="mt-2 text-xs text-secondary">
           ブラウザの設定でカメラへのアクセスを許可するか、
           ライブラリから動画を選択してください。
         </p>
-        <button
-          type="button"
-          onClick={handleLibrary}
-          className="mt-6 h-10 rounded-lg bg-accent px-5 text-sm font-title text-primary transition-all active:scale-[0.98]"
-        >
-          ライブラリから選択
-        </button>
+        <div className="mt-6 w-full max-w-xs px-2">
+          <PrimaryRecordButton type="button" onClick={handleLibrary}>
+            ライブラリから選択
+          </PrimaryRecordButton>
+        </div>
         <button
           type="button"
           onClick={startCamera}
@@ -172,7 +174,7 @@ export default function CapturePage() {
               <button
                 type="button"
                 onClick={handleLibrary}
-                className="flex items-center gap-1.5 rounded-full bg-black/40 px-3 py-1.5 text-[11px] font-label text-white/80 backdrop-blur-sm"
+                className="flex items-center gap-1.5 rounded-full bg-black/50 px-3 py-1.5 text-[11px] font-semibold text-white backdrop-blur-sm"
               >
                 <Upload size={13} strokeWidth={1.5} />
                 ライブラリ
@@ -182,8 +184,8 @@ export default function CapturePage() {
               <button
                 type="button"
                 onClick={() => setGridOn((p) => !p)}
-                className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-label backdrop-blur-sm ${
-                  gridOn ? "bg-white/20 text-white" : "bg-black/40 text-white/60"
+                className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold backdrop-blur-sm ${
+                  gridOn ? "bg-white/25 text-white" : "bg-black/50 text-white/70"
                 }`}
               >
                 <Grid3x3 size={13} strokeWidth={1.5} />
@@ -193,9 +195,8 @@ export default function CapturePage() {
           </>
         )}
 
-        {/* Recording indicator */}
         {state === "recording" && (
-          <div className="absolute left-1/2 top-4 z-10 -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 backdrop-blur-sm">
+          <div className="absolute left-1/2 top-4 z-10 -translate-x-1/2 rounded-full bg-black/60 px-3 py-1 backdrop-blur-sm">
             <div className="flex items-center gap-2">
               <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" />
               <span className="text-xs font-metric text-white">{formatTime(elapsed)}</span>
@@ -204,39 +205,43 @@ export default function CapturePage() {
         )}
       </div>
 
-      {/* Controls */}
-      <div className="flex items-center justify-center gap-8 bg-white px-6 py-5">
+      {/* Controls — 暗いバー上に録画ボタンを置き、白背景に白ボタン問題を解消 */}
+      <div className="shrink-0 border-t border-white/10 bg-zinc-950 px-5 py-4">
         {state === "recorded" ? (
-          <>
+          <div className="flex gap-3">
             <button
               type="button"
               onClick={retake}
-              className="flex h-10 items-center gap-1.5 rounded-lg px-4 text-xs font-title text-secondary transition-colors active:text-primary"
+              className="flex min-h-[40px] flex-1 items-center justify-center gap-1.5 rounded-xl border border-white/25 bg-white/5 px-3 text-[12px] font-bold text-white transition-all duration-150 active:scale-[0.98] active:bg-white/10"
             >
-              <X size={16} strokeWidth={1.5} />
+              <X size={16} strokeWidth={1.75} />
               撮り直す
             </button>
+            <div className="flex-[1.2]">
+              <PrimaryRecordButton type="button" surface="dark" onClick={proceed}>
+                記録する
+              </PrimaryRecordButton>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-2">
+            <p className="text-[11px] font-medium text-white/50">
+              {state === "recording" ? "タップで停止" : "タップで録画開始"}
+            </p>
             <button
               type="button"
-              onClick={proceed}
-              className="h-10 rounded-lg bg-accent px-6 text-sm font-title text-primary transition-all active:scale-[0.98]"
+              onClick={state === "recording" ? stopRecording : startRecording}
+              disabled={state === "idle"}
+              aria-label={state === "recording" ? "録画を停止" : "録画を開始"}
+              className="flex h-[56px] w-[56px] items-center justify-center rounded-full border-[3px] border-white/90 bg-zinc-950 shadow-[0_0_0_6px_rgba(255,255,255,0.08)] transition-all duration-150 active:scale-95 disabled:opacity-40"
             >
-              記録する
+              {state === "recording" ? (
+                <CircleStop size={26} strokeWidth={2} className="text-red-500" fill="currentColor" />
+              ) : (
+                <span className="block h-[42px] w-[42px] rounded-full bg-red-500 ring-2 ring-white/90" />
+              )}
             </button>
-          </>
-        ) : (
-          <button
-            type="button"
-            onClick={state === "recording" ? stopRecording : startRecording}
-            disabled={state === "idle"}
-            className="group flex h-[68px] w-[68px] items-center justify-center rounded-full border-[3px] border-accent transition-all active:scale-95 disabled:opacity-40"
-          >
-            {state === "recording" ? (
-              <CircleStop size={28} className="text-red-500" />
-            ) : (
-              <div className="h-[54px] w-[54px] rounded-full bg-accent" />
-            )}
-          </button>
+          </div>
         )}
       </div>
     </div>

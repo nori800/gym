@@ -9,7 +9,7 @@ const TOOLS: { tool: DrawTool; icon: typeof Minus; label: string }[] = [
   { tool: "circle", icon: Circle, label: "円" },
 ];
 
-const DRAW_COLORS = ["#DCFC67", "#EF4444", "#3B82F6", "#FFFFFF"];
+const DRAW_COLORS = ["#3eed8d", "#EF4444", "#3B82F6", "#FFFFFF"];
 
 interface Props {
   activeTool: DrawTool;
@@ -27,7 +27,7 @@ export function DrawToolbar({
   canUndo, onUndo, onClearAll,
 }: Props) {
   return (
-    <div className="flex items-center gap-2 rounded-xl bg-surface p-2">
+    <div className="flex items-center gap-2 rounded-lg bg-surface p-2">
       {TOOLS.map(({ tool, icon: Icon, label }) => (
         <button
           key={tool}

@@ -1,20 +1,30 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ChevronDown, Video as VideoIcon } from "lucide-react";
 import { MOCK_VIDEOS } from "@/lib/mocks/videos";
 import { EXERCISE_TYPES } from "@/lib/mocks/exercises";
 import { formatDate } from "@/lib/utils/formatDate";
+import { getWorkoutSessionById } from "@/lib/mocks/workoutHistory";
 
 type SortKey = "newest" | "oldest";
 
-export default function VideosPage() {
+function VideosPageInner() {
+  const searchParams = useSearchParams();
+  const sessionFilter = searchParams.get("session");
+
   const [filter, setFilter] = useState<string>("all");
   const [sort, setSort] = useState<SortKey>("newest");
 
+  const sessionTitle = sessionFilter ? getWorkoutSessionById(sessionFilter)?.title : null;
+
   const filtered = useMemo(() => {
     let list = [...MOCK_VIDEOS];
+    if (sessionFilter) {
+      list = list.filter((v) => v.workout_session_id === sessionFilter);
+    }
     if (filter !== "all") list = list.filter((v) => v.exercise_type === filter);
     list.sort((a, b) =>
       sort === "newest"
@@ -22,11 +32,31 @@ export default function VideosPage() {
         : a.shot_date.localeCompare(b.shot_date),
     );
     return list;
-  }, [filter, sort]);
+  }, [filter, sort, sessionFilter]);
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-title">動画一覧</h1>
+      <div>
+        <p className="text-[11px] font-caption uppercase tracking-[0.12em] text-muted">
+          Library
+        </p>
+        <h1 className="mt-0.5 text-[22px] font-bold tracking-tight">動画ライブラリ</h1>
+      </div>
+
+      {sessionFilter && (
+        <div className="flex items-center justify-between gap-3 rounded-xl bg-chip px-3 py-2.5">
+          <p className="min-w-0 text-[12px] text-secondary">
+            <span className="font-bold text-primary">{sessionTitle ?? "このセッション"}</span>
+            に紐付いた動画
+          </p>
+          <Link
+            href="/videos"
+            className="shrink-0 text-[11px] font-bold text-muted underline-offset-2 hover:text-primary"
+          >
+            解除
+          </Link>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex gap-2">
@@ -34,7 +64,7 @@ export default function VideosPage() {
           <select
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            className="h-9 w-full appearance-none rounded-lg bg-surface px-3 pr-8 text-xs text-primary focus:outline-none focus:ring-2 focus:ring-accent/40"
+            className="h-9 w-full appearance-none rounded-lg border border-border bg-white px-3 pr-8 text-xs text-primary focus:outline-none focus:ring-2 focus:ring-primary/10"
           >
             <option value="all">すべて</option>
             {EXERCISE_TYPES.map((t) => (
@@ -49,7 +79,7 @@ export default function VideosPage() {
           <select
             value={sort}
             onChange={(e) => setSort(e.target.value as SortKey)}
-            className="h-9 appearance-none rounded-lg bg-surface px-3 pr-8 text-xs text-primary focus:outline-none focus:ring-2 focus:ring-accent/40"
+            className="h-9 appearance-none rounded-lg border border-border bg-white px-3 pr-8 text-xs text-primary focus:outline-none focus:ring-2 focus:ring-primary/10"
           >
             <option value="newest">新しい順</option>
             <option value="oldest">古い順</option>
@@ -58,12 +88,12 @@ export default function VideosPage() {
         </div>
       </div>
 
-      {/* List */}
       {filtered.length === 0 ? (
         <div className="flex flex-col items-center py-20">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-surface">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-chip">
             <VideoIcon size={24} strokeWidth={1.5} className="text-muted" />
           </div>
+          <p className="mt-3 text-sm text-secondary">条件に一致する動画がありません</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -71,22 +101,27 @@ export default function VideosPage() {
             <Link
               key={v.id}
               href={`/videos/${v.id}`}
-              className="flex gap-4 rounded-xl bg-surface p-3 transition-colors active:bg-surface/80"
+              className="flex gap-4 rounded-[18px] bg-white p-3 shadow-[0_0_0_1px_rgba(0,0,0,.04)] transition-colors active:bg-surface"
             >
               <div className="flex h-16 w-24 shrink-0 items-center justify-center rounded-lg bg-neutral-200">
                 <VideoIcon size={20} strokeWidth={1.5} className="text-muted" />
               </div>
               <div className="flex min-w-0 flex-1 flex-col justify-center">
                 <p className="truncate text-sm font-title">{v.title}</p>
-                <div className="mt-1 flex items-center gap-2 text-[11px] text-muted">
+                <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted">
                   <span>{v.exercise_type}</span>
                   <span>·</span>
                   <span>{formatDate(v.shot_date)}</span>
-                  {v.duration && (
+                  {v.duration != null && (
                     <>
                       <span>·</span>
                       <span>{v.duration}秒</span>
                     </>
+                  )}
+                  {v.workout_session_id && (
+                    <span className="rounded-full bg-chip px-2 py-0.5 text-[10px] font-bold text-secondary">
+                      ワークアウト紐付け
+                    </span>
                   )}
                 </div>
               </div>
@@ -95,5 +130,13 @@ export default function VideosPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function VideosPage() {
+  return (
+    <Suspense fallback={<div className="py-12 text-center text-sm text-muted">読み込み中…</div>}>
+      <VideosPageInner />
+    </Suspense>
   );
 }

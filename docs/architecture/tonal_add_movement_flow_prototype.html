@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tonal Add Movement Flow</title>
+  <style>
+    :root {
+      --bg: #111315;
+      --panel: #17191c;
+      --panel-2: #1f2328;
+      --text: #f5f5f5;
+      --muted: #9aa0a6;
+      --line: #2b3138;
+      --surface: #f3f3f3;
+      --surface-2: #ffffff;
+      --ink: #101010;
+      --sub: #7a7a7a;
+      --chip: #eeeeee;
+      --accent: #dcfc67;
+      --success: #34c759;
+      --radius-xl: 28px;
+      --radius-lg: 20px;
+      --radius-md: 16px;
+      --radius-sm: 12px;
+      --shadow: 0 14px 30px rgba(0,0,0,.12);
+      --phone-shadow: 0 30px 60px rgba(0,0,0,.35);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(220,252,103,.08), transparent 22%),
+        radial-gradient(circle at bottom right, rgba(255,255,255,.05), transparent 16%),
+        var(--bg);
+      color: var(--text);
+    }
+
+    .app {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 360px 1fr;
+    }
+
+    .sidebar {
+      border-right: 1px solid var(--line);
+      background: rgba(255,255,255,.02);
+      padding: 28px 20px 24px;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow: auto;
+    }
+
+    .eyebrow {
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .14em;
+      color: var(--accent);
+      margin-bottom: 10px;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0 0 12px;
+      font-size: 30px;
+      line-height: 1.05;
+      letter-spacing: -.04em;
+    }
+
+    .lead {
+      margin: 0 0 22px;
+      color: var(--muted);
+      line-height: 1.55;
+      font-size: 14px;
+    }
+
+    .flow-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 14px;
+      margin-bottom: 18px;
+    }
+
+    .flow-card strong {
+      display: block;
+      font-size: 14px;
+      margin-bottom: 6px;
+    }
+
+    .flow-card p {
+      margin: 0;
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .steps {
+      display: grid;
+      gap: 8px;
+    }
+
+    .step {
+      width: 100%;
+      text-align: left;
+      display: grid;
+      grid-template-columns: 38px 1fr;
+      gap: 12px;
+      align-items: start;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--text);
+      border-radius: 16px;
+      padding: 12px;
+      cursor: pointer;
+      transition: .18s ease;
+    }
+
+    .step:hover { border-color: #3a434c; transform: translateY(-1px); }
+    .step.active {
+      border-color: rgba(220,252,103,.45);
+      background: linear-gradient(180deg, rgba(220,252,103,.08), rgba(255,255,255,.01));
+      box-shadow: inset 0 0 0 1px rgba(220,252,103,.18);
+    }
+
+    .step-index {
+      width: 38px;
+      height: 38px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      background: #0f1012;
+      border: 1px solid #30343a;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .step.active .step-index {
+      background: var(--accent);
+      color: #111;
+      border-color: transparent;
+    }
+
+    .step-title {
+      font-size: 14px;
+      font-weight: 800;
+      margin: 2px 0 4px;
+      line-height: 1.2;
+    }
+
+    .step-desc {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .main {
+      padding: 28px 28px 40px;
+      overflow: auto;
+    }
+
+    .top-controls {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+    }
+
+    .screen-meta h2 {
+      margin: 0 0 6px;
+      font-size: 28px;
+      letter-spacing: -.04em;
+    }
+
+    .screen-meta p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.5;
+      max-width: 820px;
+    }
+
+    .nav-buttons {
+      display: flex;
+      gap: 10px;
+    }
+
+    .nav-btn {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--text);
+      min-height: 42px;
+      padding: 0 16px;
+      border-radius: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .nav-btn:hover { border-color: #3a434c; }
+
+    .stage {
+      display: grid;
+      grid-template-columns: 420px minmax(320px, 1fr);
+      gap: 26px;
+      align-items: start;
+    }
+
+    .phone-wrap {
+      position: sticky;
+      top: 28px;
+    }
+
+    .phone {
+      width: 390px;
+      min-height: 820px;
+      background: var(--surface);
+      border-radius: 34px;
+      box-shadow: var(--phone-shadow);
+      overflow: hidden;
+      border: 8px solid #141414;
+      position: relative;
+      color: var(--ink);
+    }
+
+    .notch {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 128px;
+      height: 28px;
+      border-radius: 18px;
+      background: #111;
+      z-index: 5;
+    }
+
+    .screen {
+      display: none;
+      min-height: 820px;
+      background: var(--surface);
+    }
+
+    .screen.active { display: block; }
+
+    .statusbar {
+      height: 46px;
+      padding: 14px 18px 0;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      font-size: 15px;
+      font-weight: 800;
+      position: relative;
+    }
+
+    .status-right {
+      position: absolute;
+      right: 18px;
+      top: 14px;
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .signal { display: flex; gap: 2px; align-items: end; height: 14px; }
+    .signal span { width: 3px; background: #111; display: inline-block; border-radius: 2px; }
+    .signal span:nth-child(1){height:5px;} .signal span:nth-child(2){height:8px;} .signal span:nth-child(3){height:11px;} .signal span:nth-child(4){height:14px;}
+    .battery { width: 24px; height: 12px; border: 2px solid #111; border-radius: 4px; position: relative; }
+    .battery::after { content:""; position:absolute; right:-4px; top:3px; width:2px; height:4px; background:#111; border-radius:2px; }
+    .battery-fill { width: 14px; height: 8px; background:#111; border-radius:2px; margin:1px; }
+
+    .page { padding: 18px 22px 34px; }
+    .row { display: flex; justify-content: space-between; align-items: center; }
+    .muted { color: var(--sub); }
+    .page-title { font-size: 28px; line-height: 1.12; letter-spacing: -.04em; font-weight: 700; margin: 0; }
+    .subtext { font-size: 18px; color: var(--sub); }
+    .spacer-32 { height: 32px; }
+    .spacer-20 { height: 20px; }
+    .spacer-12 { height: 12px; }
+    .spacer-8 { height: 8px; }
+    .icon-plain { font-size: 40px; line-height: 1; font-weight: 300; }
+    .icon-circle { width: 40px; height: 40px; border-radius: 999px; background: #e8e8e8; display: grid; place-items: center; font-size: 18px; }
+
+    .block-card { border-radius: 4px; overflow: hidden; background: #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.02); }
+    .block-head { background: #000; color: #fff; height: 76px; padding: 0 28px; display:flex; align-items:center; justify-content:space-between; }
+    .block-left { display:flex; gap: 14px; align-items:center; }
+    .block-name { font-size: 25px; font-weight: 800; letter-spacing: -.02em; }
+    .block-sets { font-size: 17px; font-weight: 500; }
+    .ellipsis { font-size: 30px; letter-spacing: -.08em; transform: translateY(-2px); }
+    .block-body { min-height: 346px; display:grid; place-items:center; background:#fff; }
+    .plus-area { display:flex; flex-direction:column; align-items:center; gap: 14px; }
+    .plus-circle { width: 78px; height: 78px; border-radius: 999px; border: 2px solid #bfbfbf; display:grid; place-items:center; font-size: 46px; color:#444; font-weight:300; }
+    .plus-label { font-size: 14px; font-weight: 800; letter-spacing: .02em; }
+
+    .search-line { height: 42px; display:flex; align-items:center; gap: 10px; border-bottom: 1px solid #cfcfcf; color:#9a9a9a; font-size: 16px; margin-top: 10px; }
+    .alpha { font-size: 12px; font-weight: 800; color:#6f6f6f; letter-spacing: .10em; margin: 18px 0 10px; }
+    .movement-list { background:#fff; border-radius: 18px; overflow:hidden; box-shadow: 0 0 0 1px rgba(0,0,0,.04); }
+    .movement-row { display:grid; grid-template-columns: 64px 1fr auto; align-items:center; gap: 14px; min-height: 76px; padding: 10px 14px; border-top: 1px solid #ededed; }
+    .movement-row:first-child { border-top: none; }
+    .thumb { width: 64px; height: 48px; border-radius: 10px; background: linear-gradient(135deg, #d8d8d8, #bdbdbd); position: relative; overflow:hidden; }
+    .thumb::after { content:""; position:absolute; inset:0; background: linear-gradient(180deg, rgba(0,0,0,.08), rgba(0,0,0,.18)); }
+    .movement-title { font-size: 17px; font-weight: 700; letter-spacing: -.02em; }
+    .chev { font-size: 22px; color:#9a9a9a; }
+    .check { width: 24px; height: 24px; border-radius: 999px; background:#000; color:#fff; display:grid; place-items:center; font-size: 13px; }
+    .fab { position: absolute; left: 50%; transform: translateX(-50%); bottom: 34px; background:#000; color:#fff; border-radius: 999px; padding: 14px 22px; font-size: 13px; font-weight: 800; letter-spacing: .06em; box-shadow: 0 12px 24px rgba(0,0,0,.2); }
+
+    .hero-media { height: 220px; border-radius: 18px; background: linear-gradient(135deg, #e4e4e4, #cfcfcf); position: relative; overflow:hidden; }
+    .hero-media::after { content:"▶"; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width: 62px; height: 62px; border-radius:999px; display:grid; place-items:center; background: rgba(0,0,0,.68); color:#fff; font-size: 26px; }
+    .segmented { margin-top: 16px; background:#ececec; border-radius: 14px; padding: 4px; display:grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+    .seg { min-height: 36px; border-radius: 10px; display:grid; place-items:center; font-size: 14px; font-weight: 700; color:#555; }
+    .seg.active { background:#000; color:#fff; }
+    .config-card { margin-top: 16px; background:#fff; border-radius: 18px; box-shadow: 0 0 0 1px rgba(0,0,0,.04); overflow:hidden; }
+    .config-head { padding: 16px 18px 10px; display:flex; justify-content:space-between; align-items:center; font-size: 13px; letter-spacing: .12em; color:#555; font-weight: 800; }
+    .config-row { min-height: 62px; display:grid; grid-template-columns: 1fr auto; gap: 12px; align-items:center; padding: 0 18px; border-top: 1px solid #ededed; }
+    .config-row:first-of-type { border-top:none; }
+    .row-label { font-size: 18px; font-weight: 600; }
+    .toggle { width: 52px; height: 32px; border-radius:999px; background:#d8d8d8; position: relative; }
+    .toggle::after { content:""; width:28px; height:28px; border-radius:999px; background:#fff; position:absolute; top:2px; left:2px; box-shadow: 0 1px 2px rgba(0,0,0,.16); }
+    .toggle.on { background:#34c759; }
+    .toggle.on::after { left:22px; }
+    .stepper { display:grid; grid-template-columns: 42px 56px 42px; height: 40px; border:1px solid #d8d8d8; border-radius: 10px; overflow:hidden; }
+    .stepper > div { display:grid; place-items:center; font-size: 18px; font-weight: 700; }
+    .stepper .value { background:#000; color:#fff; font-size: 16px; }
+    .show-all { padding: 14px 18px 18px; font-size: 14px; font-weight: 800; letter-spacing: .06em; }
+    .cta-fixed { position: absolute; left: 22px; right: 22px; bottom: 24px; height: 52px; border-radius: 12px; background:#000; color:#fff; display:grid; place-items:center; font-size: 16px; font-weight: 800; letter-spacing: .05em; }
+
+    .modal-backdrop { position:absolute; inset:0; background: rgba(0,0,0,.48); display:grid; place-items:center; padding: 32px; }
+    .modal { width: 100%; background:#fff; border-radius: 18px; overflow:hidden; box-shadow: 0 20px 40px rgba(0,0,0,.24); }
+    .modal-body { padding: 22px 22px 18px; }
+    .modal-title { margin:0 0 10px; font-size: 24px; font-weight: 700; letter-spacing: -.03em; }
+    .modal-copy { margin:0; color:#666; line-height:1.55; font-size:15px; }
+    .modal-ok { height: 54px; background:#000; color:#fff; display:grid; place-items:center; font-size: 18px; font-weight: 800; }
+
+    .choice-grid { padding: 0 18px 18px; display:grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .choice { min-height: 50px; border-radius: 12px; background:#ececec; color:#222; display:grid; place-items:center; font-size: 14px; font-weight: 800; text-align:center; padding: 6px; }
+    .choice.active { background:#000; color:#fff; }
+
+    .movement-added { min-height: 78px; display:grid; grid-template-columns: 56px 1fr auto; align-items:center; gap: 14px; padding: 12px 18px; border-top:1px solid #ededed; }
+    .move-thumb { width: 56px; height: 56px; border-radius: 12px; background: linear-gradient(135deg, #ddd, #bebebe); }
+    .move-title { font-size: 18px; font-weight: 700; letter-spacing: -.02em; }
+    .move-meta { font-size: 13px; color:#6e6e6e; margin-top: 4px; line-height: 1.4; }
+    .handle { color:#8e8e8e; font-size: 20px; letter-spacing: -.1em; }
+    .inside-add { padding: 18px; border-top: 1px solid #ededed; display:flex; justify-content:center; }
+    .inside-add .plus-area { gap: 10px; }
+    .inside-add .plus-circle { width: 64px; height: 64px; font-size: 38px; }
+    .add-block { margin-top: 18px; background:#fff; border-radius: 18px; min-height: 120px; display:grid; place-items:center; box-shadow: 0 0 0 1px rgba(0,0,0,.04); }
+    .add-block .plus-area { gap: 10px; }
+    .toast { position:absolute; left: 50%; transform: translateX(-50%); bottom: 28px; background:#000; color:#fff; padding: 14px 18px; border-radius: 999px; font-size: 14px; font-weight: 700; box-shadow: 0 12px 24px rgba(0,0,0,.24); white-space: nowrap; }
+
+    .explain {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 20px;
+    }
+
+    .explain h3 {
+      margin: 0 0 10px;
+      font-size: 22px;
+      letter-spacing: -.03em;
+    }
+
+    .flow-role {
+      display: inline-flex;
+      min-height: 30px;
+      align-items: center;
+      padding: 0 12px;
+      border-radius: 999px;
+      background: rgba(220,252,103,.12);
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+    }
+
+    .explain p {
+      margin: 0 0 14px;
+      color: #d3d6da;
+      line-height: 1.65;
+      font-size: 14px;
+    }
+
+    .bullet-card {
+      background: rgba(255,255,255,.02);
+      border: 1px solid rgba(255,255,255,.06);
+      border-radius: 16px;
+      padding: 14px;
+      margin-top: 14px;
+    }
+
+    .bullet-card strong {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+
+    .bullet-card ul {
+      margin: 0;
+      padding-left: 18px;
+      color: var(--muted);
+      line-height: 1.6;
+      font-size: 13px;
+    }
+
+    @media (max-width: 1100px) {
+      .app { grid-template-columns: 1fr; }
+      .sidebar { position: static; height: auto; border-right: none; border-bottom: 1px solid var(--line); }
+      .stage { grid-template-columns: 1fr; }
+      .phone-wrap { position: static; }
+    }
+
+    @media (max-width: 520px) {
+      .main { padding: 20px 14px 28px; }
+      .phone { width: 100%; min-height: 780px; }
+      .page { padding-left: 18px; padding-right: 18px; }
+      .cta-fixed { left: 18px; right: 18px; }
+      .top-controls { align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="eyebrow">Tonal Flow</div>
+      <h1>ムーブメント追加フロー</h1>
+      <p class="lead">0〜10の全画面をHTMLでつないだプロトタイプです。左のステップを押すと、右のプレビューが切り替わります。</p>
+
+      <div class="flow-card">
+        <strong>全体の流れ</strong>
+        <p>編集画面で追加位置を理解 → 一覧で探す → 選ぶ → 詳細設定する → 追加を確定 → 編集画面へ戻る → 成功通知。</p>
+      </div>
+
+      <div class="steps" id="steps"></div>
+    </aside>
+
+    <main class="main">
+      <div class="top-controls">
+        <div class="screen-meta">
+          <h2 id="metaTitle">0. 入口</h2>
+          <p id="metaDesc">ワークアウト編集の空状態。ユーザーはここから ADD MOVE を押して追加フローに入ります。</p>
+        </div>
+        <div class="nav-buttons">
+          <button class="nav-btn" id="prevBtn">← 前へ</button>
+          <button class="nav-btn" id="nextBtn">次へ →</button>
+        </div>
+      </div>
+
+      <div class="stage">
+        <div class="phone-wrap">
+          <div class="phone">
+            <div class="notch"></div>
+
+            <section class="screen active" data-screen="0">
+              <div class="statusbar">9:41<div class="status-right"><div class="signal"><span></span><span></span><span></span><span></span></div><div class="battery"><div class="battery-fill"></div></div></div></div>
+              <div class="page">
+                <div class="row"><div class="icon-plain">×</div><div class="icon-circle">✎</div></div>
+                <div class="spacer-32"></div>
+                <h1 class="page-title">Mobbin Workout</h1>
+                <div class="spacer-20"></div>
+                <div class="subtext muted">0 Min</div>
+                <div class="spacer-8"></div>
+                <div class="subtext muted">Description</div>
+                <div class="spacer-32"></div>
+                <div class="block-card">
+                  <div class="block-head"><div class="block-left"><div class="block-name">BLOCK 1</div><div class="block-sets">3 Sets</div></div><div class="ellipsis">...</div></div>
+                  <div class="block-body">
+                    <div class="plus-area"><div class="plus-circle">+</div><div class="plus-label">ADD MOVE</div></div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section class="screen" data-screen="1">
+              <div class="statusbar">9:41<div class="status-right"><div class="signal"><span></span><span></span><span></span><span></span></div><div class="battery"><div class="battery-fill"></div></div></div></div>
+              <div class="page" style="padding-bottom:90px; position:relative;">
+                <div class="row"><div style="font-size:26px;">‹</div><div style="font-size:28px; font-weight:700; letter-spacing:-.03em;">Movements</div><div style="font-size:17px; font-weight:600;">Select</div></div>
+                <div class="search-line">⌕ <span>Search</span></div>
+                <div class="alpha">A</div>
+                <div class="movement-list">
+                  <div class="movement-row"><div class="thumb"></div><div class="movement-title">Alt. Bench Press</div><div class="chev">›</div></div>
+                  <div class="movement-row"><div class="thumb"></div><div class="movement-title">Alt. Neutral Lat Pulldown</div><div class="chev">›</div></div>
+                  <div class="movement-row"><div class="thumb"></div><div class="movement-title">Alternating Biceps Curl</div><div class="chev">›</div></div>
+                  <div class="movement-row"><div class="thumb"></div><div class="movement-title">Alternating Goblet Reverse Lunge</div><div class="chev">›</div></div>
+                  <div class="movement-row"><div class="thumb"></div><div class="movement-title">Ankle Strap Move</div><div class="chev">›</div></div>
+                </div>
+                <div class="fab">FILTER</div>
+              </div>
+            </section>
+
+            <section class="screen" data-screen="2">
+              <div class="statusbar">9:41<div class="status-right"><div class="signal"><span></span><span></span><span></span><span></span></div><div class="battery"><div class="battery-fill"></div></div></div></div>
+              <div class="page" style="padding-bottom:90px; position:relative;">
+                <div class="row"><div style="font-size:26px;">‹</div><div style="font-size:28px; font-weight:700; letter-spacing:-.03em;">Movements</div><div style="font-size:17px; font-weight:600;">Select</div></div>
+                <div class="search-line">⌕ <span>Search</span></div>
+                <div class="alpha">A</div>
+                <div class="movement-list">
+                  <div class="movement-row"><div class="thumb"></div><div class="movement-title">Alt. Bench Press</div><div class="check">✓</div></div>
+                  <div class="movement-row"><div class="thumb"></div><div class="movement-title">Alt. Neutral Lat Pulldown</div><div class="chev">›</div></div>
+                  <div class="movement-row"><div class="thumb"></div><div class="movement-title">Alternating Biceps Curl</div><div class="chev">›</div></div>
+                  <div class="movement-row"><div class="thumb"></div><div class="movement-title">Alternating Goblet Reverse Lunge</div><div class="chev">›</div></div>
+                </div>
+                <div class="fab">FILTER</div>
+              </div>
+            </section>
+
+            <section class="screen" data-screen="3">
+              <div class="statusbar">9:41<div class="status-right"><div class="signal"><span></span><span></span><span></span><span></span></div><div class="battery"><div class="battery-fill"></div></div></div></div>
+              <div class="page" style="padding-bottom:96px; position:relative;">
+                <div class="row"><div style="font-size:26px;">‹</div><div style="font-size:26px; font-weight:700; letter-spacing:-.03em;">Alt. Bench Press</div><div style="font-size:16px; font-weight:600;">About</div></div>
+                <div class="spacer-20"></div>
+                <div class="hero-media"></div>
+                <div class="segmented"><div class="seg active">Movement Demo</div><div class="seg">Muscle View</div></div>
+                <div class="config-card">
+                  <div class="config-head"><div>SETS &amp; REPS</div><div>ⓘ</div></div>
+                  <div class="config-row"><div class="row-label">Warm-Up Sets</div><div class="toggle on"></div></div>
+                  <div class="config-row"><div class="row-label">Reps</div><div class="stepper"><div>−</div><div class="value">8</div><div>＋</div></div></div>
+                  <div class="config-row"><div class="row-label">Sets</div><div class="stepper"><div>−</div><div class="value">5</div><div>＋</div></div></div>
+                  <div class="show-all">SHOW ALL SETS</div>
+                </div>
+                <div class="cta-fixed">ADD MOVEMENT</div>
+              </div>
+            </section>
+
+            <section class="screen" data-screen="4">
+              <div class="statusbar">9:41<div class="status-right"><div class="signal"><span></span><span></span><span></span><span></span></div><div class="battery"><div class="battery-fill"></div></div></div></div>
+              <div class="page" style="padding-bottom:96px; position:relative;">
+                <div class="row"><div style="font-size:26px;">‹</div><div style="font-size:26px; font-weight:700; letter-spacing:-.03em;">Alt. Bench Press</div><div style="font-size:16px; font-weight:600;">About</div></div>
+                <div class="spacer-20"></div>
+                <div class="hero-media"></div>
+                <div class="segmented"><div class="seg active">Movement Demo</div><div class="seg">Muscle View</div></div>
+                <div class="config-card">
+                  <div class="config-head"><div>SETS &amp; REPS</div><div>ⓘ</div></div>
+                  <div class="config-row"><div class="row-label">Warm-Up Sets</div><div class="toggle on"></div></div>
+                  <div class="config-row"><div class="row-label">Reps</div><div class="stepper"><div>−</div><div class="value">8</div><div>＋</div></div></div>
+                  <div class="show-all">SHOW ALL SETS</div>
+                </div>
+                <div class="cta-fixed">ADD MOVEMENT</div>
+              </div>
+              <div class="modal-backdrop">
+                <div class="modal">
+                  <div class="modal-body">
+                    <h3 class="modal-title">Warm-Up Set</h3>
+                    <p class="modal-copy">Tonal reduces the weight for warm-up sets. They don’t affect your strength score or count toward PRs.</p>
+                  </div>
+                  <div class="modal-ok">OK</div>
+                </div>
+              </div>
+            </section>
+
+            <section class="screen" data-screen="5">
+              <div class="statusbar">9:41<div class="status-right"><div class="signal"><span></span><span></span><span></span><span></span></div><div class="battery"><div class="battery-fill"></div></div></div></div>
+              <div class="page" style="padding-bottom:96px; position:relative;">
+                <div class="row"><div style="font-size:26px;">‹</div><div style="font-size:26px; font-weight:700; letter-spacing:-.03em;">Alt. Bench Press</div><div style="font-size:16px; font-weight:600;">About</div></div>
+                <div class="spacer-20"></div>
+                <div class="hero-media"></div>
+                <div class="segmented"><div class="seg active">Movement Demo</div><div class="seg">Muscle View</div></div>
+                <div class="config-card">
+                  <div class="config-head"><div>SETS &amp; REPS</div><div>ⓘ</div></div>
+                  <div class="config-row"><div class="row-label">Warm-Up Sets</div><div class="toggle on"></div></div>
+                  <div class="config-row"><div class="row-label">Reps</div><div class="stepper"><div>−</div><div class="value">8</div><div>＋</div></div></div>
+                  <div class="config-row"><div class="row-label">Sets</div><div class="stepper"><div>−</div><div class="value">5</div><div>＋</div></div></div>
+                  <div class="show-all">SHOW ALL SETS</div>
+                </div>
+                <div class="cta-fixed">ADD MOVEMENT</div>
+              </div>
+            </section>
+
+            <section class="screen" data-screen="6">
+              <div class="statusbar">9:41<div class="status-right"><div class="signal"><span></span><span></span><span></span><span></span></div><div class="battery"><div class="battery-fill"></div></div></div></div>
+              <div class="page" style="padding-bottom:96px; position:relative;">
+                <div class="row"><div style="font-size:26px;">‹</div><div style="font-size:26px; font-weight:700; letter-spacing:-.03em;">Alt. Bench Press</div><div style="font-size:16px; font-weight:600;">About</div></div>
+                <div class="spacer-20"></div>
+                <div class="config-card">
+                  <div class="config-head"><div>SETS &amp; REPS</div><div>ⓘ</div></div>
+                  <div class="config-row"><div class="row-label">Set 1 Warm-Up</div><div class="stepper"><div>−</div><div class="value">8</div><div>＋</div></div></div>
+                  <div class="config-row"><div class="row-label">Set 2</div><div class="stepper"><div>−</div><div class="value">8</div><div>＋</div></div></div>
+                  <div class="config-row"><div class="row-label">Set 3</div><div class="stepper"><div>−</div><div class="value">8</div><div>＋</div></div></div>
+                  <div class="config-row"><div class="row-label">Set 4</div><div class="stepper"><div>−</div><div class="value">8</div><div>＋</div></div></div>
+                  <div class="config-row"><div class="row-label">Set 5</div><div class="stepper"><div>−</div><div class="value">8</div><div>＋</div></div></div>
+                  <div class="config-row"><div class="row-label">Set 6</div><div class="stepper"><div>−</div><div class="value">8</div><div>＋</div></div></div>
+                  <div class="show-all">HIDE ALL SETS</div>
+                </div>
+                <div class="cta-fixed">ADD MOVEMENT</div>
+              </div>
+            </section>
+
+            <section class="screen" data-screen="7">
+              <div class="statusbar">9:41<div class="status-right"><div class="signal"><span></span><span></span><span></span><span></span></div><div class="battery"><div class="battery-fill"></div></div></div></div>
+              <div class="page" style="padding-bottom:96px; position:relative;">
+                <div class="row"><div style="font-size:26px;">‹</div><div style="font-size:26px; font-weight:700; letter-spacing:-.03em;">Alt. Bench Press</div><div style="font-size:16px; font-weight:600;">About</div></div>
+                <div class="spacer-20"></div>
+                <div class="config-card">
+                  <div class="config-head"><div>WEIGHT MODES</div><div>ⓘ</div></div>
+                  <div class="choice-grid"><div class="choice">SMART FLEX</div><div class="choice active">ECCENTRIC</div><div class="choice">CHAINS</div><div class="choice">SPOTTER</div></div>
+                </div>
+                <div class="spacer-12"></div>
+                <div class="config-card">
+                  <div class="config-head"><div>ASSISTANCE</div><div>ⓘ</div></div>
+                  <div class="choice-grid"><div class="choice active">SPOTTER</div><div class="choice">BURNOUT</div></div>
+                </div>
+                <div class="cta-fixed">ADD MOVEMENT</div>
+              </div>
+            </section>
+
+            <section class="screen" data-screen="8">
+              <div class="statusbar">9:41<div class="status-right"><div class="signal"><span></span><span></span><span></span><span></span></div><div class="battery"><div class="battery-fill"></div></div></div></div>
+              <div class="page">
+                <div class="row"><div class="icon-plain">×</div><div style="font-size:18px; font-weight:700;">Save</div></div>
+                <div class="spacer-32"></div>
+                <h1 class="page-title">Mobbin Workout</h1>
+                <div class="spacer-20"></div>
+                <div class="subtext muted">0 Min</div>
+                <div class="spacer-8"></div>
+                <div class="subtext muted">Description</div>
+                <div class="spacer-20"></div>
+                <div class="block-card">
+                  <div class="block-head"><div class="block-left"><div class="block-name">BLOCK 1</div><div class="block-sets">Warm-up + 5 sets</div></div><div class="ellipsis">...</div></div>
+                  <div class="movement-added"><div class="move-thumb"></div><div><div class="move-title">Alt. Bench Press</div><div class="move-meta">24 reps • Burnout • Warm-up • Eccentric</div></div><div class="handle">⋮⋮</div></div>
+                  <div class="inside-add"><div class="plus-area"><div class="plus-circle">+</div><div class="plus-label">ADD MOVE</div></div></div>
+                </div>
+              </div>
+            </section>
+
+            <section class="screen" data-screen="9">
+              <div class="statusbar">9:41<div class="status-right"><div class="signal"><span></span><span></span><span></span><span></span></div><div class="battery"><div class="battery-fill"></div></div></div></div>
+              <div class="page">
+                <div class="row"><div class="icon-plain">×</div><div style="font-size:18px; font-weight:700;">Save</div></div>
+                <div class="spacer-32"></div>
+                <h1 class="page-title">Mobbin Workout</h1>
+                <div class="spacer-20"></div>
+                <div class="subtext muted">0 Min</div>
+                <div class="spacer-8"></div>
+                <div class="subtext muted">Description</div>
+                <div class="spacer-20"></div>
+                <div class="block-card">
+                  <div class="block-head"><div class="block-left"><div class="block-name">BLOCK 1</div><div class="block-sets">Warm-up + 5 sets</div></div><div class="ellipsis">...</div></div>
+                  <div class="movement-added"><div class="move-thumb"></div><div><div class="move-title">Alt. Bench Press</div><div class="move-meta">24 reps • Burnout • Warm-up • Eccentric</div></div><div class="handle">⋮⋮</div></div>
+                  <div class="inside-add"><div class="plus-area"><div class="plus-circle">+</div><div class="plus-label">ADD MOVE</div></div></div>
+                </div>
+                <div class="add-block"><div class="plus-area"><div class="plus-circle">+</div><div class="plus-label">ADD BLOCK</div></div></div>
+              </div>
+            </section>
+
+            <section class="screen" data-screen="10">
+              <div class="statusbar">9:41<div class="status-right"><div class="signal"><span></span><span></span><span></span><span></span></div><div class="battery"><div class="battery-fill"></div></div></div></div>
+              <div class="page" style="position:relative; min-height:770px;">
+                <div class="row"><div class="icon-plain">×</div><div style="font-size:18px; font-weight:700;">Save</div></div>
+                <div class="spacer-32"></div>
+                <h1 class="page-title">Mobbin Workout</h1>
+                <div class="spacer-20"></div>
+                <div class="subtext muted">0 Min</div>
+                <div class="spacer-8"></div>
+                <div class="subtext muted">Description</div>
+                <div class="spacer-20"></div>
+                <div class="block-card">
+                  <div class="block-head"><div class="block-left"><div class="block-name">BLOCK 1</div><div class="block-sets">Warm-up + 5 sets</div></div><div class="ellipsis">...</div></div>
+                  <div class="movement-added"><div class="move-thumb"></div><div><div class="move-title">Alt. Bench Press</div><div class="move-meta">24 reps • Burnout • Warm-up • Eccentric</div></div><div class="handle">⋮⋮</div></div>
+                  <div class="inside-add"><div class="plus-area"><div class="plus-circle">+</div><div class="plus-label">ADD MOVE</div></div></div>
+                </div>
+                <div class="toast">Your movement was added!</div>
+              </div>
+            </section>
+          </div>
+        </div>
+
+        <div class="explain">
+          <div class="flow-role" id="roleTag">入口</div>
+          <h3 id="explainTitle">ワークアウト編集の空状態</h3>
+          <p id="explainBody">まだ種目が入っていない状態です。ユーザーは「どこに追加するのか」を理解して、中央の ADD MOVE から次に進みます。</p>
+
+          <div class="bullet-card">
+            <strong>この画面でユーザーがやること</strong>
+            <ul id="todoList"></ul>
+          </div>
+
+          <div class="bullet-card">
+            <strong>この画面の意図</strong>
+            <ul id="intentList"></ul>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const data = [
+      {
+        short: '入口',
+        title: '0. ワークアウト編集の空状態',
+        desc: '最初の入口。ユーザーは ADD MOVE を押して、ムーブメント追加フローへ進む。',
+        role: '入口',
+        body: 'まだ種目が入っていない状態です。ユーザーは「どこに追加するのか」を理解して、中央の ADD MOVE から次に進みます。',
+        todo: ['空の BLOCK を確認する', 'ADD MOVE を押す', '追加位置が BLOCK 1 であることを理解する'],
+        intent: ['編集対象の構造を最初に理解させる', '空状態でも次にやることが明確に見えるようにする', '追加フローの入口を1箇所に絞って迷わせない']
+      },
+      {
+        short: '探索',
+        title: '1. Movements 一覧',
+        desc: '追加できる種目を探す画面。検索・一覧・FILTER が主役。',
+        role: '候補探索',
+        body: 'ユーザーは種目を検索したり、一覧を見ながら候補を探します。ここでは設定ではなく「何を追加するか」を決めることが目的です。',
+        todo: ['検索で候補を絞る', '一覧をスクロールする', '必要なら FILTER を押す'],
+        intent: ['候補探索に集中させる', '検索は静かに、一覧は読みやすく見せる', 'FILTER を必要な人だけが使える位置に置く']
+      },
+      {
+        short: '選択',
+        title: '2. 一覧の選択状態',
+        desc: 'どの種目を選んだかを見失わないようにする画面。',
+        role: '選択状態の明示',
+        body: '一覧の中で、どれを選んだかを明確に示す段階です。色だけでなくチェック記号で選択状態を表します。',
+        todo: ['選択した種目を確認する', '他と取り違えていないか見る', '必要なら別の種目に切り替える'],
+        intent: ['選択済みを誤認なく見せる', '色依存のUIにしない', '確認の安心感を作る']
+      },
+      {
+        short: '設定',
+        title: '3. 種目詳細の初期設定',
+        desc: '選んだ種目を追加前に設定する画面。メディア→設定→確定の順。',
+        role: '基本設定',
+        body: '上のメディアで種目を理解し、下の白カードで sets や reps を調整し、最後に ADD MOVEMENT で確定します。',
+        todo: ['種目内容を確認する', 'Warm-Up Sets を確認する', 'reps と sets を決める', 'ADD MOVEMENT を押す判断をする'],
+        intent: ['何を追加するかから、どう追加するかへ進める', '設定UIをカード化して理解しやすくする', '最後の確定ボタンを黒で強く見せる']
+      },
+      {
+        short: '補足',
+        title: '4. 説明モーダル',
+        desc: 'その場で意味を補足して、不安なく設定を続けさせる。',
+        role: '補足説明',
+        body: 'Warm-Up Set の意味など、ユーザーが迷いやすい点をモーダルで短く説明します。画面遷移させずに理解を補うための画面です。',
+        todo: ['説明を読む', '設定の意味を理解する', 'OK を押して元の設定画面へ戻る'],
+        intent: ['不安を残さない', '画面遷移せず文脈を保つ', '主要操作を1つに絞って迷わせない']
+      },
+      {
+        short: '調整',
+        title: '5. 基本設定の全体像',
+        desc: '詳細設定の最初の全体像を見せる。',
+        role: '設定全体の把握',
+        body: '詳細設定の入り口として、どの項目を調整できるかをユーザーに見せます。まだ深く触らなくても、構成が理解できる状態です。',
+        todo: ['設定項目の全体像を見る', '必要な設定に進む', '追加前の主要条件を確認する'],
+        intent: ['長い設定画面でも見通しを持たせる', 'カードごとに意味の塊を作る', '深掘り前に安心感を持たせる']
+      },
+      {
+        short: '深掘り',
+        title: '6. Sets & Reps の詳細調整',
+        desc: 'セットごとに細かく調整するステップ。',
+        role: '詳細調整',
+        body: 'Warm-up を含む複数セットを個別に設定します。同じUIを縦に繰り返すことで、学習コストを下げています。',
+        todo: ['各セットの reps を調整する', 'Warm-up を含めた全体構成を確認する', '必要なら HIDE ALL SETS で折りたたむ'],
+        intent: ['反復UIで迷いを減らす', '細かい設定をしても崩れない構造にする', 'Expand / Collapse で情報量をコントロールする']
+      },
+      {
+        short: '方式',
+        title: '7. Weight Modes / Assistance 設定',
+        desc: '負荷方式や補助方式を選ぶステップ。',
+        role: '方式選択',
+        body: 'Weight Modes や Assistance を黒=選択 / 灰=非選択で明快に切り替えます。ここは比較して選ぶための画面です。',
+        todo: ['Weight Mode を選ぶ', 'Assistance を選ぶ', '選択状態を確認する', 'ADD MOVEMENT で確定する'],
+        intent: ['比較と選択を分かりやすくする', '選択状態を強いコントラストで見せる', '関連設定をカテゴリごとに整理する']
+      },
+      {
+        short: '戻る',
+        title: '8. 追加後の編集画面',
+        desc: '追加結果を確認し、そのまま編集を続ける画面。',
+        role: '追加結果の確認',
+        body: '追加されたムーブメントが BLOCK 内に入り、ユーザーは結果を確認したあと、そのまま次の編集に進めます。',
+        todo: ['追加された種目を確認する', '内容が正しいか見る', '必要なら並べ替えや追加を続ける'],
+        intent: ['追加して終わりではなく編集を続けさせる', '結果を視覚的に確認させる', '元の文脈へ自然に戻す']
+      },
+      {
+        short: '拡張',
+        title: '9. ADD BLOCK を見せる状態',
+        desc: '今のブロックだけでなく、次のブロックも作れると伝える。',
+        role: '構成拡張',
+        body: '1つのムーブメント追加が終わった後、ワークアウト全体を組み立てられることを見せる段階です。',
+        todo: ['次の BLOCK を追加するか判断する', '現在の BLOCK 構成を確認する', '必要なら ADD BLOCK を押す'],
+        intent: ['ワークアウト全体を設計できると伝える', '次の構成追加の入口を大きく見せる', '編集の拡張可能性を感じさせる']
+      },
+      {
+        short: '完了',
+        title: '10. 成功トースト表示',
+        desc: '追加成功を短く返して、編集の流れを止めない。',
+        role: '完了フィードバック',
+        body: 'Your movement was added! のような短いトーストで、追加が成功したことを安心して受け取れる画面です。',
+        todo: ['成功を確認する', 'そのまま次の編集へ進む', '必要なら Save まで進める'],
+        intent: ['結果を一言で返す', '別画面に飛ばさず文脈を保つ', '気持ちよく完了感を与える']
+      }
+    ];
+
+    const stepsEl = document.getElementById('steps');
+    const screens = [...document.querySelectorAll('.screen')];
+    const metaTitle = document.getElementById('metaTitle');
+    const metaDesc = document.getElementById('metaDesc');
+    const roleTag = document.getElementById('roleTag');
+    const explainTitle = document.getElementById('explainTitle');
+    const explainBody = document.getElementById('explainBody');
+    const todoList = document.getElementById('todoList');
+    const intentList = document.getElementById('intentList');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+
+    let current = 0;
+
+    function renderSteps() {
+      stepsEl.innerHTML = data.map((item, i) => `
+        <button class="step ${i === current ? 'active' : ''}" data-index="${i}">
+          <div class="step-index">${i}</div>
+          <div>
+            <div class="step-title">${item.short}</div>
+            <div class="step-desc">${item.desc}</div>
+          </div>
+        </button>
+      `).join('');
+
+      stepsEl.querySelectorAll('.step').forEach(btn => {
+        btn.addEventListener('click', () => setScreen(Number(btn.dataset.index)));
+      });
+    }
+
+    function renderLists(listEl, arr) {
+      listEl.innerHTML = arr.map(item => `<li>${item}</li>`).join('');
+    }
+
+    function setScreen(index) {
+      current = (index + data.length) % data.length;
+      screens.forEach((screen, i) => screen.classList.toggle('active', i === current));
+      renderSteps();
+
+      const item = data[current];
+      metaTitle.textContent = item.title;
+      metaDesc.textContent = item.desc;
+      roleTag.textContent = item.role;
+      explainTitle.textContent = item.title.replace(/^\d+\.\s*/, '');
+      explainBody.textContent = item.body;
+      renderLists(todoList, item.todo);
+      renderLists(intentList, item.intent);
+    }
+
+    prevBtn.addEventListener('click', () => setScreen(current - 1));
+    nextBtn.addEventListener('click', () => setScreen(current + 1));
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft') setScreen(current - 1);
+      if (e.key === 'ArrowRight') setScreen(current + 1);
+    });
+
+    setScreen(0);
+  </script>
+</body>
+</html>

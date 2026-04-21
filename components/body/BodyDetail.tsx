@@ -3,19 +3,24 @@
 import { useState, useMemo } from "react";
 import { MOCK_BODY_LOGS } from "@/lib/mocks/bodyLogs";
 import type { BodyLog } from "@/types";
-import { BodyInput } from "@/components/dashboard/BodyInput";
+import { RecordDateBlock } from "@/components/common/RecordDateBlock";
 
 type Range = "week" | "month" | "year";
 
-const RANGE_LABELS: Record<Range, string> = { week: "1W", month: "1M", year: "1Y" };
+const RANGE_OPTIONS: { key: Range; label: string }[] = [
+  { key: "week", label: "1週間" },
+  { key: "month", label: "1ヶ月" },
+  { key: "year", label: "1年" },
+];
+
+const TODAY = "2026-04-21";
 
 function filterByRange(data: BodyLog[], range: Range): BodyLog[] {
-  const now = new Date("2026-04-20");
-  const cutoff = new Date(now);
+  const cutoff = new Date(`${TODAY}T12:00:00`);
   if (range === "week") cutoff.setDate(cutoff.getDate() - 7);
   else if (range === "month") cutoff.setMonth(cutoff.getMonth() - 1);
   else cutoff.setFullYear(cutoff.getFullYear() - 1);
-  return data.filter((d) => new Date(d.log_date) >= cutoff);
+  return data.filter((d) => new Date(`${d.log_date}T12:00:00`) >= cutoff);
 }
 
 function niceAxis(min: number, max: number, ticks: number) {
@@ -31,7 +36,7 @@ function niceAxis(min: number, max: number, ticks: number) {
 }
 
 function formatXLabel(d: string, range: Range) {
-  const date = new Date(d);
+  const date = new Date(`${d}T12:00:00`);
   if (range === "year") return `${date.getFullYear()}/${date.getMonth() + 1}`;
   return `${date.getMonth() + 1}/${date.getDate()}`;
 }
@@ -42,9 +47,14 @@ export function BodyDetail() {
 
   if (data.length === 0) {
     return (
-      <div className="space-y-6">
-        <BodyInput />
-        <p className="py-16 text-center text-sm text-muted">データがありません</p>
+      <div className="flex flex-col items-center justify-center py-20">
+        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
+          <span className="text-2xl font-light text-muted">∿</span>
+        </div>
+        <p className="mt-4 text-[15px] font-bold">この期間のデータがありません</p>
+        <p className="mt-1.5 text-center text-[12px] text-secondary">
+          右下のボタンから記録を追加できます
+        </p>
       </div>
     );
   }
@@ -71,93 +81,178 @@ export function BodyDetail() {
 
   const toX = (i: number) => PL + (data.length === 1 ? chartW / 2 : (i / (data.length - 1)) * chartW);
   const toYw = (v: number) => PT + ((wAxis.hi - v) / (wAxis.hi - wAxis.lo)) * chartH;
-  const toYf = (v: number) => fAxis ? PT + ((fAxis.hi - v) / (fAxis.hi - fAxis.lo)) * chartH : 0;
+  const toYf = (v: number) =>
+    fAxis ? PT + ((fAxis.hi - v) / (fAxis.hi - fAxis.lo)) * chartH : 0;
 
-  const weightPath = data.map((d, i) => `${i === 0 ? "M" : "L"}${toX(i).toFixed(1)},${toYw(d.weight).toFixed(1)}`).join(" ");
+  const weightPath = data
+    .map((d, i) => `${i === 0 ? "M" : "L"}${toX(i).toFixed(1)},${toYw(d.weight).toFixed(1)}`)
+    .join(" ");
   const fillPath = `${weightPath} L${toX(data.length - 1).toFixed(1)},${PT + chartH} L${PL},${PT + chartH} Z`;
 
-  const fatPath = fAxis && fats.length >= 2
-    ? data.filter((d) => d.body_fat != null).map((d, i) => `${i === 0 ? "M" : "L"}${toX(data.indexOf(d)).toFixed(1)},${toYf(d.body_fat!).toFixed(1)}`).join(" ")
-    : null;
+  const fatPath =
+    fAxis && fats.length >= 2
+      ? data
+          .filter((d) => d.body_fat != null)
+          .map((d, i) => {
+            const idx = data.indexOf(d);
+            return `${i === 0 ? "M" : "L"}${toX(idx).toFixed(1)},${toYf(d.body_fat!).toFixed(1)}`;
+          })
+          .join(" ")
+      : null;
 
   const xLabelCount = range === "week" ? data.length : range === "month" ? 4 : 5;
   const xLabelIndices: number[] = [];
   if (data.length <= xLabelCount) {
     data.forEach((_, i) => xLabelIndices.push(i));
   } else {
-    for (let i = 0; i < xLabelCount; i++) xLabelIndices.push(Math.round((i / (xLabelCount - 1)) * (data.length - 1)));
+    for (let i = 0; i < xLabelCount; i++)
+      xLabelIndices.push(Math.round((i / (xLabelCount - 1)) * (data.length - 1)));
   }
 
   return (
     <div className="space-y-6">
-      {/* Summary */}
-      <div className="flex items-end gap-6">
-        <div>
-          <p className="text-3xl font-metric">{latest.weight}<span className="text-sm font-caption text-muted"> kg</span></p>
-          <p className="mt-0.5 text-[11px] text-muted">
-            期間内 <span className={totalDiff <= 0 ? "text-primary" : "text-secondary"}>{totalDiffStr} kg</span>
-          </p>
+      {/* 最新サマリー — ワークアウトカードと同系の白カード */}
+      <article className="overflow-hidden rounded-2xl bg-white p-4 shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
+        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">
+          最新の記録
+        </p>
+        <div className="mt-2">
+          <RecordDateBlock iso={latest.log_date} />
         </div>
-        {latest.body_fat != null && (
+        <div className="mt-4 flex items-end gap-8 border-t border-border pt-4">
           <div>
-            <p className="text-xl font-metric">{latest.body_fat}<span className="text-sm font-caption text-muted"> %</span></p>
-            <p className="mt-0.5 text-[11px] text-muted">体脂肪率</p>
+            <p className="text-2xl font-metric leading-none">
+              {latest.weight}
+              <span className="text-sm font-caption text-muted"> kg</span>
+            </p>
+            <p className="mt-1 text-[11px] text-secondary">
+              表示期間の変化{" "}
+              <span className={totalDiff <= 0 ? "font-semibold text-primary" : "font-semibold text-secondary"}>
+                {totalDiffStr} kg
+              </span>
+            </p>
           </div>
-        )}
+          {latest.body_fat != null && (
+            <div>
+              <p className="text-xl font-metric leading-none">
+                {latest.body_fat}
+                <span className="text-sm font-caption text-muted"> %</span>
+              </p>
+              <p className="mt-1 text-[11px] text-muted">体脂肪率</p>
+            </div>
+          )}
+        </div>
+      </article>
+
+      {/* 期間 — 略号ではなく日本語ラベル + 種目一覧と同型のチップ */}
+      <div>
+        <p className="mb-2 px-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-muted">
+          表示期間
+        </p>
+        <div className="flex flex-wrap gap-1.5">
+          {RANGE_OPTIONS.map(({ key, label }) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setRange(key)}
+              className={`rounded-full px-3.5 py-1.5 text-[11px] font-bold transition-all duration-150 active:scale-95 ${
+                range === key
+                  ? "bg-inverse text-on-inverse"
+                  : "bg-white text-secondary shadow-[0_0_0_1px_rgba(0,0,0,.08)]"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Range tabs */}
-      <div className="flex gap-1 rounded-lg bg-surface p-1">
-        {(Object.keys(RANGE_LABELS) as Range[]).map((r) => (
-          <button
-            key={r}
-            type="button"
-            onClick={() => setRange(r)}
-            className={`flex-1 rounded-md py-1.5 text-xs font-title transition-all ${
-              range === r ? "bg-white text-primary shadow-sm" : "text-muted"
-            }`}
-          >
-            {RANGE_LABELS[r]}
-          </button>
-        ))}
-      </div>
-
-      {/* Chart */}
-      <div className="rounded-xl bg-surface p-4">
-        <svg viewBox={`0 0 ${W} ${H}`} className="w-full" preserveAspectRatio="xMidYMid meet">
-          <path d={fillPath} fill="#DCFC67" fillOpacity={0.10} />
+      {/* チャート */}
+      <div className="rounded-2xl bg-white p-4 shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
+        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">
+          推移
+        </p>
+        <svg viewBox={`0 0 ${W} ${H}`} className="mt-2 w-full" preserveAspectRatio="xMidYMid meet">
+          <path d={fillPath} fill="#000000" fillOpacity={0.04} />
 
           {wAxis.steps.map((v) => (
-            <line key={`g${v}`} x1={PL} y1={toYw(v)} x2={W - PR} y2={toYw(v)} stroke="#EBEBEB" strokeWidth={0.5} />
+            <line
+              key={`g${v}`}
+              x1={PL}
+              y1={toYw(v)}
+              x2={W - PR}
+              y2={toYw(v)}
+              stroke="#ededed"
+              strokeWidth={0.5}
+            />
           ))}
 
-          <path d={weightPath} fill="none" stroke="#1A1A1A" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+          <path
+            d={weightPath}
+            fill="none"
+            stroke="#1A1A1A"
+            strokeWidth={1.5}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
 
           {fatPath && (
-            <path d={fatPath} fill="none" stroke="#B0B0B0" strokeWidth={1} strokeDasharray="3 3" strokeLinecap="round" />
+            <path
+              d={fatPath}
+              fill="none"
+              stroke="#9a9a9a"
+              strokeWidth={1}
+              strokeDasharray="3 3"
+              strokeLinecap="round"
+            />
           )}
 
           {data.map((d, i) => (
-            <circle key={d.id} cx={toX(i)} cy={toYw(d.weight)} r={data.length > 20 ? 1.5 : 2.5} fill="#1A1A1A" />
+            <circle
+              key={d.id}
+              cx={toX(i)}
+              cy={toYw(d.weight)}
+              r={data.length > 20 ? 1.5 : 2.5}
+              fill="#1A1A1A"
+            />
           ))}
 
           {xLabelIndices.map((i) => (
-            <text key={`x${i}`} x={toX(i)} y={H - 4} textAnchor="middle" className="fill-muted text-[8px]">
+            <text
+              key={`x${i}`}
+              x={toX(i)}
+              y={H - 4}
+              textAnchor="middle"
+              className="fill-muted text-[8px]"
+            >
               {formatXLabel(data[i].log_date, range)}
             </text>
           ))}
 
           {wAxis.steps.map((v) => (
-            <text key={`yw${v}`} x={PL - 4} y={toYw(v) + 3} textAnchor="end" className="fill-muted text-[7px]">
+            <text
+              key={`yw${v}`}
+              x={PL - 4}
+              y={toYw(v) + 3}
+              textAnchor="end"
+              className="fill-muted text-[7px]"
+            >
               {v.toFixed(v % 1 === 0 ? 0 : 1)}
             </text>
           ))}
 
-          {fAxis && fAxis.steps.map((v) => (
-            <text key={`yf${v}`} x={W - PR + 4} y={toYf(v) + 3} textAnchor="start" className="fill-secondary text-[7px]">
-              {v.toFixed(v % 1 === 0 ? 0 : 1)}%
-            </text>
-          ))}
+          {fAxis &&
+            fAxis.steps.map((v) => (
+              <text
+                key={`yf${v}`}
+                x={W - PR + 4}
+                y={toYf(v) + 3}
+                textAnchor="start"
+                className="fill-secondary text-[7px]"
+              >
+                {v.toFixed(v % 1 === 0 ? 0 : 1)}%
+              </text>
+            ))}
         </svg>
 
         <div className="mt-2 flex gap-4 text-[10px] text-muted">
@@ -166,34 +261,41 @@ export function BodyDetail() {
           </span>
           {fats.length > 0 && (
             <span className="flex items-center gap-1">
-              <span className="inline-block h-[1px] w-3 border-t border-dashed border-muted" /> 体脂肪 (%)
+              <span className="inline-block h-[1px] w-3 border-t border-dashed border-muted" />{" "}
+              体脂肪 (%)
             </span>
           )}
         </div>
       </div>
 
-      {/* Log list */}
-      <section className="space-y-3">
-        <h2 className="text-xs font-title uppercase tracking-wider text-muted">記録一覧</h2>
-        <div className="divide-y divide-border rounded-xl bg-surface">
-          {[...data].reverse().slice(0, 10).map((d) => {
-            const date = new Date(d.log_date);
-            return (
-              <div key={d.id} className="flex items-center justify-between px-4 py-3">
-                <span className="text-xs text-muted">
-                  {date.getMonth() + 1}/{date.getDate()}
+      {/* 履歴リスト — ワークアウト履歴カードと同型 */}
+      <section>
+        <p className="mb-2 px-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-muted">
+          記録一覧
+        </p>
+        <div className="space-y-2">
+          {[...data].reverse().slice(0, 12).map((d) => (
+            <article
+              key={d.id}
+              className="overflow-hidden rounded-2xl bg-white p-4 shadow-[0_0_0_1px_rgba(0,0,0,.04)]"
+            >
+              <RecordDateBlock iso={d.log_date} />
+              <div className="mt-3 flex items-baseline justify-between border-t border-border pt-3">
+                <span className="text-[20px] font-metric leading-none">
+                  {d.weight}
+                  <span className="text-xs font-caption text-muted"> kg</span>
                 </span>
-                <div className="flex gap-4 text-sm">
-                  <span className="font-metric">{d.weight} kg</span>
-                  {d.body_fat != null && <span className="text-secondary">{d.body_fat}%</span>}
-                </div>
+                {d.body_fat != null && (
+                  <span className="text-[15px] font-metric text-secondary">
+                    {d.body_fat}
+                    <span className="text-xs font-caption text-muted"> %</span>
+                  </span>
+                )}
               </div>
-            );
-          })}
+            </article>
+          ))}
         </div>
       </section>
-
-      <BodyInput />
     </div>
   );
 }

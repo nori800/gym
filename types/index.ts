@@ -8,6 +8,8 @@ export type Video = {
   thumbnail_path: string | null;
   duration: number | null;
   memo: string;
+  /** ワークアウト履歴のセッションID（任意。紐付けない動画は null） */
+  workout_session_id: string | null;
   created_at: string;
   updated_at: string;
 };

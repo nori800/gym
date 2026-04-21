@@ -43,7 +43,7 @@ export default function SignupPage() {
             onChange={(e) => setEmail(e.target.value)}
             onBlur={validate}
             placeholder="you@example.com"
-            className={`h-12 w-full rounded-xl border-0 bg-surface px-4 text-sm text-primary placeholder:text-muted/60 focus:outline-none focus:ring-2 ${errors.email ? "ring-2 ring-danger" : "focus:ring-accent/40"}`}
+            className={`h-12 w-full rounded-lg border border-border bg-white px-4 text-sm text-primary placeholder:text-muted/60 focus:outline-none focus:ring-2 ${errors.email ? "ring-2 ring-danger" : "focus:ring-primary/10"}`}
           />
           {errors.email && <p className="mt-1 text-xs text-danger">{errors.email}</p>}
         </div>
@@ -57,7 +57,7 @@ export default function SignupPage() {
             onChange={(e) => setPassword(e.target.value)}
             onBlur={validate}
             placeholder="8 文字以上"
-            className={`h-12 w-full rounded-xl border-0 bg-surface px-4 text-sm text-primary placeholder:text-muted/60 focus:outline-none focus:ring-2 ${errors.password ? "ring-2 ring-danger" : "focus:ring-accent/40"}`}
+            className={`h-12 w-full rounded-lg border border-border bg-white px-4 text-sm text-primary placeholder:text-muted/60 focus:outline-none focus:ring-2 ${errors.password ? "ring-2 ring-danger" : "focus:ring-primary/10"}`}
           />
           {errors.password && <p className="mt-1 text-xs text-danger">{errors.password}</p>}
         </div>
@@ -71,7 +71,7 @@ export default function SignupPage() {
             onChange={(e) => setConfirm(e.target.value)}
             onBlur={validate}
             placeholder="もう一度入力"
-            className={`h-12 w-full rounded-xl border-0 bg-surface px-4 text-sm text-primary placeholder:text-muted/60 focus:outline-none focus:ring-2 ${errors.confirm ? "ring-2 ring-danger" : "focus:ring-accent/40"}`}
+            className={`h-12 w-full rounded-lg border border-border bg-white px-4 text-sm text-primary placeholder:text-muted/60 focus:outline-none focus:ring-2 ${errors.confirm ? "ring-2 ring-danger" : "focus:ring-primary/10"}`}
           />
           {errors.confirm && <p className="mt-1 text-xs text-danger">{errors.confirm}</p>}
         </div>
@@ -80,7 +80,7 @@ export default function SignupPage() {
       <button
         type="button"
         onClick={handleSubmit}
-        className="mt-8 h-12 w-full rounded-xl bg-accent text-sm font-title text-primary transition-all active:scale-[0.98]"
+        className="mt-8 min-h-[44px] w-full rounded-xl bg-inverse text-sm font-extrabold tracking-wide text-on-inverse transition-colors duration-150 active:scale-[0.98]"
       >
         登録する
       </button>
