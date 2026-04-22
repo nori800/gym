@@ -10,12 +10,9 @@ interface StepperProps {
   step?: number;
   suffix?: string;
   allowDecimal?: boolean;
+  label?: string;
 }
 
-/**
- * −[ 値 ]+ のStepper。
- * 中央の値をタップすると直接入力モードに切り替わる。
- */
 export function Stepper({
   value,
   onChange,
@@ -24,6 +21,7 @@ export function Stepper({
   step = 1,
   suffix,
   allowDecimal = false,
+  label,
 }: StepperProps) {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(String(value));
@@ -52,14 +50,16 @@ export function Stepper({
   const decr = () => onChange(Math.max(min, +(value - step).toFixed(2)));
   const incr = () => onChange(Math.min(max, +(value + step).toFixed(2)));
 
+  const ariaPrefix = label ? `${label}を` : "";
+
   return (
-    <div className="inline-flex h-9 items-stretch overflow-hidden rounded-[10px] bg-chip">
+    <div className="inline-grid h-10 grid-cols-[42px_56px_42px] overflow-hidden rounded-[10px] border border-[#d8d8d8]">
       <button
         type="button"
         onClick={decr}
         disabled={value <= min}
-        className="flex w-9 items-center justify-center text-lg font-bold text-primary transition-all duration-100 active:bg-border disabled:opacity-30"
-        aria-label="減らす"
+        className="flex items-center justify-center text-lg font-bold text-primary transition-colors duration-100 active:bg-surface disabled:opacity-30"
+        aria-label={`${ariaPrefix}減らす`}
       >
         −
       </button>
@@ -78,24 +78,24 @@ export function Stepper({
               setEditing(false);
             }
           }}
-          className="w-[52px] bg-white text-center text-[14px] font-bold text-primary outline-none focus:ring-2 focus:ring-primary/20"
+          className="bg-inverse text-center text-base font-bold text-on-inverse outline-none"
         />
       ) : (
         <button
           type="button"
           onClick={() => setEditing(true)}
-          className="min-w-[52px] px-2 text-center text-[14px] font-bold text-primary transition-colors active:bg-border"
+          className="bg-inverse text-center text-base font-bold text-on-inverse transition-opacity active:opacity-80"
         >
           {value}
-          {suffix && <span className="ml-0.5 text-[11px] font-normal text-secondary">{suffix}</span>}
+          {suffix && <span className="ml-0.5 text-[11px] font-normal text-on-inverse/60">{suffix}</span>}
         </button>
       )}
       <button
         type="button"
         onClick={incr}
         disabled={value >= max}
-        className="flex w-9 items-center justify-center text-lg font-bold text-primary transition-all duration-100 active:bg-border disabled:opacity-30"
-        aria-label="増やす"
+        className="flex items-center justify-center text-lg font-bold text-primary transition-colors duration-100 active:bg-surface disabled:opacity-30"
+        aria-label={`${ariaPrefix}増やす`}
       >
         +
       </button>

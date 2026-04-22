@@ -1,14 +1,5 @@
-export const EXERCISE_TYPES = [
-  "ベンチプレス",
-  "スクワット",
-  "デッドリフト",
-  "オーバーヘッドプレス",
-  "バーベルロウ",
-  "懸垂",
-  "ダンベルカール",
-  "レッグプレス",
-  "ラットプルダウン",
-  "その他",
-] as const;
+import { MOVEMENTS } from "./movements";
 
-export type ExerciseType = (typeof EXERCISE_TYPES)[number];
+export const EXERCISE_TYPES = MOVEMENTS.map((m) => m.nameJa);
+
+export type ExerciseType = string;

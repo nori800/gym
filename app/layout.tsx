@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Noto_Sans_JP } from "next/font/google";
+import { OnboardingGate } from "@/components/onboarding/OnboardingGate";
 import "./globals.css";
 
 const inter = Inter({
@@ -32,7 +33,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="ja" className={`${inter.variable} ${notoSansJP.variable}`}>
       <body className={`${inter.className} flex min-h-dvh flex-col font-sans`}>
-        {children}
+        <OnboardingGate>{children}</OnboardingGate>
       </body>
     </html>
   );

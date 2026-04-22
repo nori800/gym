@@ -1,130 +1,196 @@
+"use client";
+
 import Link from "next/link";
-import { Settings, Video, TrendingUp } from "lucide-react";
+import { Settings, TrendingUp, Camera, ChevronRight, Dumbbell, Sparkles } from "lucide-react";
 import { MOCK_VIDEOS } from "@/lib/mocks/videos";
 import { MOCK_WORKOUT_HISTORY } from "@/lib/mocks/workoutHistory";
 import { MOCK_BODY_LOGS } from "@/lib/mocks/bodyLogs";
 import { formatJapaneseLongDate } from "@/lib/utils/formatRecordDate";
 
+function getGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 5) return "お疲れさま";
+  if (hour < 10) return "おはよう";
+  if (hour < 17) return "今日もいこう";
+  return "おつかれさま";
+}
+
+function getSuggestedWorkout() {
+  if (MOCK_WORKOUT_HISTORY.length === 0) return null;
+  const categories = MOCK_WORKOUT_HISTORY.map((w) => w.categories).flat();
+  const freq: Record<string, number> = {};
+  for (const c of categories) freq[c] = (freq[c] || 0) + 1;
+  const sorted = Object.entries(freq).sort((a, b) => a[1] - b[1]);
+  const leastTrained = sorted[0]?.[0];
+  const suggestions: Record<string, string> = {
+    "胸": "プッシュデー（胸・肩・三頭）",
+    "背中": "プルデー（背中・二頭）",
+    "肩": "ショルダーデー（肩メイン）",
+    "腕": "アームデー（腕集中）",
+    "脚": "レッグデー（脚メイン）",
+  };
+  return {
+    category: leastTrained,
+    suggestion: suggestions[leastTrained ?? ""] ?? "フルボディ",
+    reason: `${leastTrained}のトレーニング頻度が低め`,
+  };
+}
+
 export default function DashboardPage() {
   const weekSessions = MOCK_WORKOUT_HISTORY.length;
   const videoCount = MOCK_VIDEOS.length;
   const latestWeight = MOCK_BODY_LOGS[MOCK_BODY_LOGS.length - 1];
-  const latestWorkout = MOCK_WORKOUT_HISTORY[0];
+  const recentWorkouts = MOCK_WORKOUT_HISTORY.slice(0, 3);
+  const suggestion = getSuggestedWorkout();
 
   return (
     <div className="space-y-8">
-      {/* Top bar: 小さめの「FormCheck」+ 右上に設定アイコン */}
+      {/* Header */}
       <header className="flex items-center justify-between">
         <div>
-          <p className="text-[11px] font-caption uppercase tracking-[0.12em] text-muted">
+          <p className="text-xs font-title uppercase tracking-[0.12em] text-muted">
             FormCheck
           </p>
-          <h1 className="mt-0.5 text-[22px] font-bold tracking-tight">今日もいこう</h1>
+          <h1 className="mt-1 text-xl font-title tracking-tight">{getGreeting()}</h1>
         </div>
         <Link
           href="/settings"
           className="flex h-10 w-10 items-center justify-center rounded-full text-secondary transition-all duration-150 active:bg-chip active:scale-95"
           aria-label="設定"
         >
-          <Settings size={20} strokeWidth={1.75} />
+          <Settings size={20} strokeWidth={1.5} />
         </Link>
       </header>
 
-      {/* 概況サマリー */}
-      <section className="grid grid-cols-3 gap-2.5">
-        <StatCard value={weekSessions} unit="回" label="今週のセッション" />
-        <StatCard value={videoCount} unit="本" label="撮影した動画" />
-        <StatCard
-          value={latestWeight?.weight ?? "—"}
-          unit="kg"
-          label="最新の体重"
-          sub={latestWeight ? formatJapaneseLongDate(latestWeight.log_date) : undefined}
-        />
+      {/* Stats */}
+      <section className="grid grid-cols-2 gap-2.5">
+        <div className="flex flex-col justify-center rounded-[18px] bg-white p-4 shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
+          <p className="text-xs font-title uppercase tracking-[0.12em] text-muted">今週</p>
+          <p className="mt-2 flex items-baseline gap-1">
+            <span className="text-3xl font-metric leading-none">{weekSessions}</span>
+            <span className="text-sm font-caption text-muted">セッション</span>
+          </p>
+        </div>
+        <div className="flex flex-col justify-center rounded-[18px] bg-white p-4 shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
+          <p className="text-xs font-title uppercase tracking-[0.12em] text-muted">体重</p>
+          <p className="mt-2 flex items-baseline gap-1">
+            <span className="text-3xl font-metric leading-none">
+              {latestWeight?.weight ?? "—"}
+            </span>
+            <span className="text-sm font-caption text-muted">kg</span>
+          </p>
+          {latestWeight && (
+            <p className="mt-1 text-[11px] text-secondary">
+              {formatJapaneseLongDate(latestWeight.log_date)}
+            </p>
+          )}
+        </div>
       </section>
 
-      {/* 最近のワークアウト */}
-      {latestWorkout && (
-        <section className="space-y-3">
-          <div className="flex items-center justify-between px-0.5">
-            <h2 className="text-[13px] font-bold tracking-tight text-secondary">
-              最近のワークアウト
+      {/* Today's workout suggestion */}
+      {suggestion && (
+        <section>
+          <div className="flex items-center gap-1.5 px-0.5">
+            <Sparkles size={12} strokeWidth={2} className="text-accent" />
+            <h2 className="text-xs font-title uppercase tracking-[0.12em] text-muted">
+              今日のおすすめ
             </h2>
-            <Link
-              href="/workouts"
-              className="text-[12px] font-semibold text-muted transition-colors active:text-primary"
-            >
-              すべて見る →
-            </Link>
           </div>
           <Link
-            href="/workouts"
-            className="block overflow-hidden rounded-2xl bg-white shadow-[0_0_0_1px_rgba(0,0,0,.04)] transition-all duration-150 active:scale-[0.99]"
+            href="/workouts/edit"
+            className="mt-2.5 flex items-center gap-3.5 rounded-[18px] bg-white px-[18px] py-4 shadow-[0_0_0_1px_rgba(0,0,0,.04)] transition-all duration-150 active:scale-[0.99]"
           >
-            <div className="flex items-center gap-3 p-4">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-chip">
-                <TrendingUp size={18} strokeWidth={1.75} className="text-primary" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[14px] font-bold">{latestWorkout.title}</p>
-                <p className="mt-0.5 text-[11px] text-secondary">
-                  {formatJapaneseLongDate(latestWorkout.date)} · {latestWorkout.durationMin}分 ·{" "}
-                  {latestWorkout.totalSets}セット
-                </p>
-              </div>
-              <span className="text-muted">›</span>
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-accent/10">
+              <Dumbbell size={18} strokeWidth={1.5} className="text-primary" />
             </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold tracking-tight">{suggestion.suggestion}</p>
+              <p className="mt-0.5 text-[11px] text-secondary">{suggestion.reason}</p>
+            </div>
+            <ChevronRight size={16} strokeWidth={1.5} className="shrink-0 text-muted" />
           </Link>
         </section>
       )}
 
-      {/* クイックアクセス（フッターで賄えない導線） */}
+      {/* Recent workouts */}
+      {recentWorkouts.length > 0 && (
+        <section className="space-y-3">
+          <div className="flex items-center justify-between px-0.5">
+            <h2 className="text-xs font-title uppercase tracking-[0.12em] text-muted">
+              最近のワークアウト
+            </h2>
+            <Link
+              href="/workouts"
+              className="flex items-center gap-0.5 text-[12px] font-title text-secondary transition-colors active:text-primary"
+            >
+              すべて見る
+              <ChevronRight size={14} strokeWidth={1.5} />
+            </Link>
+          </div>
+          <div className="overflow-hidden rounded-[18px] bg-white shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
+            {recentWorkouts.map((workout, i) => (
+              <Link
+                key={workout.id}
+                href="/workouts"
+                className={`flex items-center gap-3.5 px-[18px] py-3.5 transition-colors duration-150 active:bg-surface ${
+                  i > 0 ? "border-t border-border" : ""
+                }`}
+              >
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-surface">
+                  <TrendingUp size={18} strokeWidth={1.5} className="text-primary" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-bold tracking-tight">{workout.title}</p>
+                  <p className="mt-0.5 text-[11px] text-secondary">
+                    {formatJapaneseLongDate(workout.date)} · {workout.durationMin}分 · {workout.totalSets}セット
+                  </p>
+                </div>
+                <ChevronRight size={16} strokeWidth={1.5} className="shrink-0 text-muted" />
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Quick access — FormCheck feature */}
       <section className="space-y-3">
-        <h2 className="px-0.5 text-[13px] font-bold tracking-tight text-secondary">
-          動画
+        <h2 className="px-0.5 text-xs font-title uppercase tracking-[0.12em] text-muted">
+          フォームチェック
         </h2>
         <Link
-          href="/videos"
-          className="flex items-center gap-3 rounded-2xl bg-white p-4 shadow-[0_0_0_1px_rgba(0,0,0,.04)] transition-all duration-150 active:scale-[0.99]"
+          href="/capture"
+          className="flex items-center gap-3.5 rounded-[18px] bg-white px-[18px] py-4 shadow-[0_0_0_1px_rgba(0,0,0,.04)] transition-all duration-150 active:scale-[0.99]"
         >
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-chip">
-            <Video size={18} strokeWidth={1.75} className="text-primary" />
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-accent/10">
+            <Camera size={18} strokeWidth={1.5} className="text-primary" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-[14px] font-bold">動画ライブラリ</p>
+            <p className="text-sm font-bold tracking-tight">撮影して記録</p>
             <p className="mt-0.5 text-[11px] text-secondary">
-              撮影したフォームチェック動画
+              フォームを撮影してチェック
             </p>
           </div>
-          <span className="text-muted">›</span>
+          <ChevronRight size={16} strokeWidth={1.5} className="shrink-0 text-muted" />
         </Link>
-      </section>
-    </div>
-  );
-}
 
-function StatCard({
-  value,
-  unit,
-  label,
-  sub,
-}: {
-  value: number | string;
-  unit: string;
-  label: string;
-  sub?: string;
-}) {
-  return (
-    <div className="flex flex-col items-center justify-center rounded-2xl bg-white px-2 py-4 shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
-      <p className="flex items-baseline gap-0.5">
-        <span className="text-[22px] font-metric leading-none">{value}</span>
-        <span className="text-[10px] font-caption text-muted">{unit}</span>
-      </p>
-      <p className="mt-1.5 text-center text-[10px] font-caption leading-tight text-secondary">
-        {label}
-      </p>
-      {sub && (
-        <p className="mt-1 line-clamp-2 text-center text-[9px] leading-tight text-muted">{sub}</p>
-      )}
+        {videoCount > 0 && (
+          <Link
+            href="/videos"
+            className="flex items-center gap-3.5 rounded-[18px] bg-white px-[18px] py-4 shadow-[0_0_0_1px_rgba(0,0,0,.04)] transition-all duration-150 active:scale-[0.99]"
+          >
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-surface">
+              <TrendingUp size={18} strokeWidth={1.5} className="text-primary" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold tracking-tight">動画ライブラリ</p>
+              <p className="mt-0.5 text-[11px] text-secondary">
+                {videoCount}本の撮影動画
+              </p>
+            </div>
+            <ChevronRight size={16} strokeWidth={1.5} className="shrink-0 text-muted" />
+          </Link>
+        )}
+      </section>
     </div>
   );
 }

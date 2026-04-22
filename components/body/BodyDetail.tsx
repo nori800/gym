@@ -47,12 +47,12 @@ export function BodyDetail() {
 
   if (data.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-20">
+      <div className="flex flex-col items-center justify-center py-24">
         <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
           <span className="text-2xl font-light text-muted">∿</span>
         </div>
-        <p className="mt-4 text-[15px] font-bold">この期間のデータがありません</p>
-        <p className="mt-1.5 text-center text-[12px] text-secondary">
+        <p className="mt-5 text-[15px] font-bold">この期間のデータがありません</p>
+        <p className="mt-2 text-center text-sm text-secondary">
           右下のボタンから記録を追加できます
         </p>
       </div>
@@ -111,9 +111,9 @@ export function BodyDetail() {
 
   return (
     <div className="space-y-6">
-      {/* 最新サマリー — ワークアウトカードと同系の白カード */}
-      <article className="overflow-hidden rounded-2xl bg-white p-4 shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
-        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">
+      {/* Latest summary */}
+      <article className="overflow-hidden rounded-[18px] bg-white p-[18px] shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
+        <p className="text-xs font-title uppercase tracking-[0.12em] text-muted">
           最新の記録
         </p>
         <div className="mt-2">
@@ -125,7 +125,7 @@ export function BodyDetail() {
               {latest.weight}
               <span className="text-sm font-caption text-muted"> kg</span>
             </p>
-            <p className="mt-1 text-[11px] text-secondary">
+            <p className="mt-1.5 text-[12px] text-secondary">
               表示期間の変化{" "}
               <span className={totalDiff <= 0 ? "font-semibold text-primary" : "font-semibold text-secondary"}>
                 {totalDiffStr} kg
@@ -138,15 +138,15 @@ export function BodyDetail() {
                 {latest.body_fat}
                 <span className="text-sm font-caption text-muted"> %</span>
               </p>
-              <p className="mt-1 text-[11px] text-muted">体脂肪率</p>
+              <p className="mt-1.5 text-[12px] text-muted">体脂肪率</p>
             </div>
           )}
         </div>
       </article>
 
-      {/* 期間 — 略号ではなく日本語ラベル + 種目一覧と同型のチップ */}
+      {/* Range selector */}
       <div>
-        <p className="mb-2 px-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-muted">
+        <p className="mb-2 px-0.5 text-xs font-title uppercase tracking-[0.12em] text-muted">
           表示期間
         </p>
         <div className="flex flex-wrap gap-1.5">
@@ -155,7 +155,7 @@ export function BodyDetail() {
               key={key}
               type="button"
               onClick={() => setRange(key)}
-              className={`rounded-full px-3.5 py-1.5 text-[11px] font-bold transition-all duration-150 active:scale-95 ${
+              className={`rounded-full px-3.5 py-1.5 text-[11px] font-extrabold tracking-wide transition-all duration-150 active:scale-95 ${
                 range === key
                   ? "bg-inverse text-on-inverse"
                   : "bg-white text-secondary shadow-[0_0_0_1px_rgba(0,0,0,.08)]"
@@ -167,13 +167,13 @@ export function BodyDetail() {
         </div>
       </div>
 
-      {/* チャート */}
-      <div className="rounded-2xl bg-white p-4 shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
-        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">
+      {/* Chart */}
+      <div className="rounded-[18px] bg-white p-[18px] shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
+        <p className="text-xs font-title uppercase tracking-[0.12em] text-muted">
           推移
         </p>
-        <svg viewBox={`0 0 ${W} ${H}`} className="mt-2 w-full" preserveAspectRatio="xMidYMid meet">
-          <path d={fillPath} fill="#000000" fillOpacity={0.04} />
+        <svg viewBox={`0 0 ${W} ${H}`} className="mt-3 w-full" preserveAspectRatio="xMidYMid meet">
+          <path d={fillPath} fill="rgba(62,237,141,0.12)" />
 
           {wAxis.steps.map((v) => (
             <line
@@ -182,7 +182,7 @@ export function BodyDetail() {
               y1={toYw(v)}
               x2={W - PR}
               y2={toYw(v)}
-              stroke="#ededed"
+              stroke="#EBEBEB"
               strokeWidth={0.5}
             />
           ))}
@@ -190,7 +190,7 @@ export function BodyDetail() {
           <path
             d={weightPath}
             fill="none"
-            stroke="#1A1A1A"
+            stroke="#3eed8d"
             strokeWidth={1.5}
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -200,7 +200,7 @@ export function BodyDetail() {
             <path
               d={fatPath}
               fill="none"
-              stroke="#9a9a9a"
+              stroke="#999999"
               strokeWidth={1}
               strokeDasharray="3 3"
               strokeLinecap="round"
@@ -213,7 +213,7 @@ export function BodyDetail() {
               cx={toX(i)}
               cy={toYw(d.weight)}
               r={data.length > 20 ? 1.5 : 2.5}
-              fill="#1A1A1A"
+              fill="#3eed8d"
             />
           ))}
 
@@ -235,7 +235,7 @@ export function BodyDetail() {
               x={PL - 4}
               y={toYw(v) + 3}
               textAnchor="end"
-              className="fill-muted text-[7px]"
+              className="fill-secondary text-[7px]"
             >
               {v.toFixed(v % 1 === 0 ? 0 : 1)}
             </text>
@@ -255,12 +255,12 @@ export function BodyDetail() {
             ))}
         </svg>
 
-        <div className="mt-2 flex gap-4 text-[10px] text-muted">
-          <span className="flex items-center gap-1">
-            <span className="inline-block h-0.5 w-3 rounded-full bg-primary" /> 体重 (kg)
+        <div className="mt-3 flex gap-4 text-[10px] text-secondary">
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block h-0.5 w-3 rounded-full bg-accent" /> 体重 (kg)
           </span>
           {fats.length > 0 && (
-            <span className="flex items-center gap-1">
+            <span className="flex items-center gap-1.5">
               <span className="inline-block h-[1px] w-3 border-t border-dashed border-muted" />{" "}
               体脂肪 (%)
             </span>
@@ -268,20 +268,20 @@ export function BodyDetail() {
         </div>
       </div>
 
-      {/* 履歴リスト — ワークアウト履歴カードと同型 */}
+      {/* History list */}
       <section>
-        <p className="mb-2 px-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-muted">
+        <p className="mb-2 px-0.5 text-xs font-title uppercase tracking-[0.12em] text-muted">
           記録一覧
         </p>
-        <div className="space-y-2">
+        <div className="space-y-2.5">
           {[...data].reverse().slice(0, 12).map((d) => (
             <article
               key={d.id}
-              className="overflow-hidden rounded-2xl bg-white p-4 shadow-[0_0_0_1px_rgba(0,0,0,.04)]"
+              className="overflow-hidden rounded-[18px] bg-white p-[18px] shadow-[0_0_0_1px_rgba(0,0,0,.04)]"
             >
               <RecordDateBlock iso={d.log_date} />
               <div className="mt-3 flex items-baseline justify-between border-t border-border pt-3">
-                <span className="text-[20px] font-metric leading-none">
+                <span className="text-xl font-metric leading-none">
                   {d.weight}
                   <span className="text-xs font-caption text-muted"> kg</span>
                 </span>

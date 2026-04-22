@@ -2,7 +2,7 @@
 
 import { useRef, useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Grid3x3, Upload, X, Camera, CircleStop } from "lucide-react";
+import { Grid3x3, Upload, X, Camera, CircleStop, Play, Pause } from "lucide-react";
 import { GridOverlay } from "@/components/capture/GridOverlay";
 import { PrimaryRecordButton } from "@/components/common/PrimaryRecordButton";
 
@@ -11,6 +11,7 @@ type CaptureState = "idle" | "previewing" | "recording" | "recorded";
 export default function CapturePage() {
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement>(null);
+  const previewRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -21,6 +22,7 @@ export default function CapturePage() {
   const [recordedUrl, setRecordedUrl] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   const startCamera = useCallback(async () => {
     try {
@@ -65,6 +67,7 @@ export default function CapturePage() {
       const url = URL.createObjectURL(blob);
       setRecordedUrl(url);
       setState("recorded");
+      setIsPlaying(false);
       streamRef.current?.getTracks().forEach((t) => t.stop());
     };
     recorder.start(200);
@@ -86,6 +89,7 @@ export default function CapturePage() {
     if (recordedUrl) URL.revokeObjectURL(recordedUrl);
     setRecordedUrl(null);
     setElapsed(0);
+    setIsPlaying(false);
     startCamera();
   }, [recordedUrl, startCamera]);
 
@@ -107,9 +111,22 @@ export default function CapturePage() {
       const url = URL.createObjectURL(file);
       setRecordedUrl(url);
       setState("recorded");
+      setIsPlaying(false);
       streamRef.current?.getTracks().forEach((t) => t.stop());
     };
     input.click();
+  }, []);
+
+  const togglePlayback = useCallback(() => {
+    const video = previewRef.current;
+    if (!video) return;
+    if (video.paused) {
+      video.play();
+      setIsPlaying(true);
+    } else {
+      video.pause();
+      setIsPlaying(false);
+    }
   }, []);
 
   const formatTime = (s: number) =>
@@ -117,13 +134,10 @@ export default function CapturePage() {
 
   if (error === "camera") {
     return (
-      <div
-        className="-mx-6 -mt-12 flex flex-col items-center justify-center px-8 text-center"
-        style={{ height: "calc(100dvh - 56px)" }}
-      >
+      <div className="flex flex-col items-center justify-center px-8 py-24 text-center">
         <Camera size={40} strokeWidth={1} className="mb-4 text-muted" />
         <p className="text-sm font-title">カメラにアクセスできません</p>
-        <p className="mt-2 text-xs text-secondary">
+        <p className="mt-2 text-sm leading-relaxed text-secondary">
           ブラウザの設定でカメラへのアクセスを許可するか、
           ライブラリから動画を選択してください。
         </p>
@@ -135,7 +149,7 @@ export default function CapturePage() {
         <button
           type="button"
           onClick={startCamera}
-          className="mt-3 text-xs text-secondary underline underline-offset-2"
+          className="mt-3 text-sm text-secondary underline underline-offset-2"
         >
           再試行
         </button>
@@ -144,18 +158,41 @@ export default function CapturePage() {
   }
 
   return (
-    <div className="-mx-6 -mt-12 flex flex-col" style={{ height: "calc(100dvh - 56px)" }}>
+    <div className="fixed inset-0 z-40 flex flex-col bg-black">
       {/* Viewfinder */}
-      <div className="relative flex-1 bg-black">
+      <div className="relative flex-1">
         {state === "recorded" && recordedUrl ? (
-          <video
-            src={recordedUrl}
-            className="absolute inset-0 h-full w-full object-cover"
-            playsInline
-            loop
-            autoPlay
-            muted
-          />
+          <>
+            <video
+              ref={previewRef}
+              src={recordedUrl}
+              className="absolute inset-0 h-full w-full object-cover"
+              playsInline
+              muted
+              onEnded={() => setIsPlaying(false)}
+            />
+            {/* Play/Pause overlay */}
+            <button
+              type="button"
+              onClick={togglePlayback}
+              className="absolute inset-0 z-10 flex items-center justify-center"
+              aria-label={isPlaying ? "一時停止" : "再生"}
+            >
+              {!isPlaying && (
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-black/50 backdrop-blur-sm transition-transform active:scale-95">
+                  <Play size={28} strokeWidth={2} className="ml-1 text-white" fill="white" />
+                </div>
+              )}
+            </button>
+            {isPlaying && (
+              <div className="absolute bottom-3 left-1/2 z-10 -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 backdrop-blur-sm">
+                <div className="flex items-center gap-2">
+                  <Pause size={12} strokeWidth={2} className="text-white" />
+                  <span className="text-[11px] font-metric text-white/80">再生中</span>
+                </div>
+              </div>
+            )}
+          </>
         ) : (
           <video
             ref={videoRef}
@@ -170,7 +207,7 @@ export default function CapturePage() {
         {/* Top controls */}
         {state !== "recorded" && (
           <>
-            <div className="absolute left-4 top-4 z-10">
+            <div className="absolute left-4 top-[env(safe-area-inset-top,16px)] z-10">
               <button
                 type="button"
                 onClick={handleLibrary}
@@ -180,7 +217,7 @@ export default function CapturePage() {
                 ライブラリ
               </button>
             </div>
-            <div className="absolute right-4 top-4 z-10">
+            <div className="absolute right-4 top-[env(safe-area-inset-top,16px)] z-10">
               <button
                 type="button"
                 onClick={() => setGridOn((p) => !p)}
@@ -196,7 +233,7 @@ export default function CapturePage() {
         )}
 
         {state === "recording" && (
-          <div className="absolute left-1/2 top-4 z-10 -translate-x-1/2 rounded-full bg-black/60 px-3 py-1 backdrop-blur-sm">
+          <div className="absolute left-1/2 top-[env(safe-area-inset-top,16px)] z-10 -translate-x-1/2 rounded-full bg-black/60 px-3 py-1 backdrop-blur-sm">
             <div className="flex items-center gap-2">
               <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" />
               <span className="text-xs font-metric text-white">{formatTime(elapsed)}</span>
@@ -205,16 +242,16 @@ export default function CapturePage() {
         )}
       </div>
 
-      {/* Controls — 暗いバー上に録画ボタンを置き、白背景に白ボタン問題を解消 */}
-      <div className="shrink-0 border-t border-white/10 bg-zinc-950 px-5 py-4">
+      {/* Controls */}
+      <div className="shrink-0 border-t border-white/10 bg-zinc-950 px-5 pb-[max(1rem,env(safe-area-inset-bottom,0px))] pt-4">
         {state === "recorded" ? (
           <div className="flex gap-3">
             <button
               type="button"
               onClick={retake}
-              className="flex min-h-[40px] flex-1 items-center justify-center gap-1.5 rounded-xl border border-white/25 bg-white/5 px-3 text-[12px] font-bold text-white transition-all duration-150 active:scale-[0.98] active:bg-white/10"
+              className="flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-xl border border-white/25 bg-white/5 px-3 text-sm font-bold text-white transition-all duration-150 active:scale-[0.98] active:bg-white/10"
             >
-              <X size={16} strokeWidth={1.75} />
+              <X size={16} strokeWidth={1.5} />
               撮り直す
             </button>
             <div className="flex-[1.2]">
@@ -224,7 +261,7 @@ export default function CapturePage() {
             </div>
           </div>
         ) : (
-          <div className="flex flex-col items-center gap-2">
+          <div className="flex flex-col items-center gap-2.5">
             <p className="text-[11px] font-medium text-white/50">
               {state === "recording" ? "タップで停止" : "タップで録画開始"}
             </p>
@@ -233,12 +270,12 @@ export default function CapturePage() {
               onClick={state === "recording" ? stopRecording : startRecording}
               disabled={state === "idle"}
               aria-label={state === "recording" ? "録画を停止" : "録画を開始"}
-              className="flex h-[56px] w-[56px] items-center justify-center rounded-full border-[3px] border-white/90 bg-zinc-950 shadow-[0_0_0_6px_rgba(255,255,255,0.08)] transition-all duration-150 active:scale-95 disabled:opacity-40"
+              className="flex h-[68px] w-[68px] items-center justify-center rounded-full border-[3px] border-accent bg-zinc-950 shadow-[0_0_0_6px_rgba(62,237,141,0.12)] transition-all duration-150 active:scale-95 disabled:opacity-40"
             >
               {state === "recording" ? (
-                <CircleStop size={26} strokeWidth={2} className="text-red-500" fill="currentColor" />
+                <CircleStop size={28} strokeWidth={2} className="text-red-500" fill="currentColor" />
               ) : (
-                <span className="block h-[42px] w-[42px] rounded-full bg-red-500 ring-2 ring-white/90" />
+                <span className="block h-[52px] w-[52px] rounded-full bg-accent" />
               )}
             </button>
           </div>

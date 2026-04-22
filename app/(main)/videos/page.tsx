@@ -90,10 +90,21 @@ function VideosPageInner() {
 
       {filtered.length === 0 ? (
         <div className="flex flex-col items-center py-20">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-chip">
-            <VideoIcon size={24} strokeWidth={1.5} className="text-muted" />
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
+            <VideoIcon size={26} strokeWidth={1.5} className="text-muted" />
           </div>
-          <p className="mt-3 text-sm text-secondary">条件に一致する動画がありません</p>
+          <p className="mt-5 text-[15px] font-bold">動画がありません</p>
+          <p className="mt-2 max-w-[240px] text-center text-sm leading-relaxed text-secondary">
+            {sessionFilter
+              ? "このセッションに紐付いた動画はまだありません。撮影タブからフォームを録画してみましょう。"
+              : "撮影タブからフォームを録画して、動画ライブラリに追加しましょう。"}
+          </p>
+          <Link
+            href="/capture"
+            className="mt-6 flex min-h-[44px] items-center gap-2 rounded-xl bg-inverse px-5 py-2.5 text-sm font-extrabold tracking-wide text-on-inverse transition-all active:scale-[0.98]"
+          >
+            撮影する
+          </Link>
         </div>
       ) : (
         <div className="space-y-3">

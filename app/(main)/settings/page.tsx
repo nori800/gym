@@ -6,10 +6,11 @@ import { ChevronRight, LogIn, User, Moon, Bell, Trash2 } from "lucide-react";
 
 export default function SettingsPage() {
   return (
-    <div className="space-y-10">
+    <div className="space-y-8">
       <h1 className="text-xl font-title">設定</h1>
 
-      <section className="flex items-center gap-4 rounded-[18px] bg-white p-4 shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
+      {/* User card */}
+      <section className="flex items-center gap-4 rounded-[18px] bg-white p-[18px] shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-surface">
           <User size={22} strokeWidth={1.5} className="text-muted" />
         </div>
@@ -18,17 +19,19 @@ export default function SettingsPage() {
         </div>
         <Link
           href="/login"
-          className="flex min-h-[44px] items-center gap-1 rounded-xl bg-inverse px-3 py-1.5 text-xs font-extrabold text-on-inverse transition-colors duration-150 active:scale-[0.98]"
+          className="flex min-h-[44px] items-center gap-1.5 rounded-xl bg-inverse px-4 py-2 text-xs font-extrabold tracking-wide text-on-inverse transition-all duration-150 active:scale-[0.98]"
         >
           <LogIn size={13} strokeWidth={1.5} />
           ログイン
         </Link>
       </section>
 
+      {/* Profile */}
       <ProfileForm />
 
+      {/* General */}
       <section>
-        <h2 className="mb-3 px-1 text-xs font-title text-muted">
+        <h2 className="mb-3 px-1 text-xs font-title uppercase tracking-[0.12em] text-muted">
           一般
         </h2>
         <div className="divide-y divide-border overflow-hidden rounded-[18px] bg-white shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
@@ -37,8 +40,9 @@ export default function SettingsPage() {
         </div>
       </section>
 
+      {/* Data */}
       <section>
-        <h2 className="mb-3 px-1 text-xs font-title text-muted">
+        <h2 className="mb-3 px-1 text-xs font-title uppercase tracking-[0.12em] text-muted">
           データ
         </h2>
         <div className="divide-y divide-border overflow-hidden rounded-[18px] bg-white shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
@@ -46,7 +50,7 @@ export default function SettingsPage() {
         </div>
       </section>
 
-      <p className="pt-4 text-center text-[11px] text-muted">FormCheck v0.1.0</p>
+      <p className="pt-4 text-center text-xs text-muted">FormCheck v0.1.0</p>
     </div>
   );
 }
@@ -63,64 +67,72 @@ function ProfileForm() {
 
   return (
     <section>
-      <h2 className="mb-3 px-1 text-xs font-title text-muted">
+      <h2 className="mb-3 px-1 text-xs font-title uppercase tracking-[0.12em] text-muted">
         プロフィール
       </h2>
-      <div className="space-y-3 rounded-[18px] bg-white p-4 shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
-        <Field label="表示名">
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            maxLength={30}
-            className="h-12 w-full rounded-lg border border-border bg-white px-3 text-sm text-primary focus:outline-none focus:ring-2 focus:ring-primary/10"
-          />
-        </Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="身長 (cm)">
+      <div className="overflow-hidden rounded-[18px] bg-white shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
+        <div className="divide-y divide-border">
+          <FieldRow label="表示名">
             <input
-              type="number"
-              value={height}
-              onChange={(e) => setHeight(e.target.value)}
-              placeholder="170"
-              className="h-12 w-full rounded-lg border border-border bg-white px-3 text-sm text-primary placeholder:text-muted/60 focus:outline-none focus:ring-2 focus:ring-primary/10"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              maxLength={30}
+              className="w-full bg-transparent text-right text-sm font-metric text-primary focus:outline-none"
             />
-          </Field>
-          <Field label="体重 (kg)">
+          </FieldRow>
+          <FieldRow label="身長">
+            <div className="flex items-baseline gap-1">
+              <input
+                type="number"
+                value={height}
+                onChange={(e) => setHeight(e.target.value)}
+                placeholder="170"
+                className="w-16 bg-transparent text-right text-sm font-metric text-primary placeholder:text-muted/50 focus:outline-none"
+              />
+              <span className="text-xs text-muted">cm</span>
+            </div>
+          </FieldRow>
+          <FieldRow label="体重">
+            <div className="flex items-baseline gap-1">
+              <input
+                type="number"
+                value={weight}
+                onChange={(e) => setWeight(e.target.value)}
+                placeholder="65"
+                className="w-16 bg-transparent text-right text-sm font-metric text-primary placeholder:text-muted/50 focus:outline-none"
+              />
+              <span className="text-xs text-muted">kg</span>
+            </div>
+          </FieldRow>
+          <FieldRow label="目標">
             <input
-              type="number"
-              value={weight}
-              onChange={(e) => setWeight(e.target.value)}
-              placeholder="65"
-              className="h-12 w-full rounded-lg border border-border bg-white px-3 text-sm text-primary placeholder:text-muted/60 focus:outline-none focus:ring-2 focus:ring-primary/10"
+              value={goal}
+              onChange={(e) => setGoal(e.target.value)}
+              maxLength={200}
+              placeholder="ベンチプレス 100kg"
+              className="w-full bg-transparent text-right text-sm text-primary placeholder:text-muted/50 focus:outline-none"
             />
-          </Field>
+          </FieldRow>
         </div>
-        <Field label="目標">
-          <input
-            value={goal}
-            onChange={(e) => setGoal(e.target.value)}
-            maxLength={200}
-            placeholder="ベンチプレス 100kg"
-            className="h-12 w-full rounded-lg border border-border bg-white px-3 text-sm text-primary placeholder:text-muted/60 focus:outline-none focus:ring-2 focus:ring-primary/10"
-          />
-        </Field>
-        <button
-          type="button"
-          onClick={handleSave}
-          className="min-h-[44px] w-full rounded-xl bg-inverse text-sm font-extrabold tracking-wide text-on-inverse transition-colors duration-150 active:scale-[0.98]"
-        >
-          保存
-        </button>
+        <div className="px-[18px] py-3.5">
+          <button
+            type="button"
+            onClick={handleSave}
+            className="min-h-[44px] w-full rounded-xl bg-inverse text-sm font-extrabold tracking-wide text-on-inverse transition-all duration-150 active:scale-[0.98]"
+          >
+            保存
+          </button>
+        </div>
       </div>
     </section>
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div>
-      <label className="mb-1 block text-[11px] font-label text-secondary">{label}</label>
-      {children}
+    <div className="flex min-h-[62px] items-center justify-between gap-4 px-[18px]">
+      <label className="shrink-0 text-lg font-semibold">{label}</label>
+      <div className="min-w-0 flex-1">{children}</div>
     </div>
   );
 }
@@ -136,14 +148,14 @@ function MenuItem({ icon: Icon, label, sub, danger }: MenuItemProps) {
   return (
     <button
       type="button"
-      className="flex min-h-[44px] w-full items-center gap-3 px-4 py-3.5 text-left transition-colors active:bg-surface"
+      className="flex min-h-[62px] w-full items-center gap-3.5 px-[18px] text-left transition-colors active:bg-surface"
     >
       <Icon size={18} strokeWidth={1.5} className={danger ? "text-danger" : "text-secondary"} />
-      <span className={`flex-1 text-sm font-label ${danger ? "text-danger" : "text-primary"}`}>
+      <span className={`flex-1 text-lg font-semibold ${danger ? "text-danger" : "text-primary"}`}>
         {label}
       </span>
-      {sub && <span className="text-[11px] text-muted">{sub}</span>}
-      <ChevronRight size={14} strokeWidth={1.5} className="text-muted/50" />
+      {sub && <span className="text-sm text-muted">{sub}</span>}
+      <ChevronRight size={16} strokeWidth={1.5} className="text-muted" />
     </button>
   );
 }
