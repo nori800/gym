@@ -67,9 +67,9 @@ function EmptyState() {
       <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
         <Dumbbell size={26} strokeWidth={1.5} className="text-muted" />
       </div>
-      <p className="mt-5 text-[15px] font-bold">まだ記録がありません</p>
+      <p className="mt-5 text-[15px] font-bold">ワークアウトを始めよう</p>
       <p className="mt-2 max-w-[240px] text-center text-sm leading-relaxed text-secondary">
-        右下の「新規作成」からワークアウトを作成しましょう。種目・重量・回数をセットごとに記録できます。
+        種目・重量・回数を記録して、トレーニングの成果を見える化できます。
       </p>
       <Link
         href="/workouts/edit"

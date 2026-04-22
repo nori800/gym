@@ -132,11 +132,11 @@ export default function VideoDetailPage() {
   const linkedSession = getWorkoutSessionById(video.workout_session_id);
 
   return (
-    <div className="-mx-6 -mt-12 flex flex-col" style={{ height: "calc(100dvh - 56px)" }}>
+    <div className="fixed inset-0 z-40 flex flex-col">
       {/* Header — 動画の外に独立配置 */}
       <div className="shrink-0 bg-black px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top,0px))]">
         <div className="flex items-center gap-3">
-          <button type="button" onClick={() => router.back()} className="shrink-0 text-white/80 active:text-white">
+          <button type="button" onClick={() => router.back()} className="shrink-0 text-white/80 active:text-white" aria-label="戻る">
             <ArrowLeft size={20} strokeWidth={1.5} />
           </button>
           <div className="min-w-0 flex-1">
@@ -187,7 +187,7 @@ export default function VideoDetailPage() {
       </div>
 
       {/* Controls area */}
-      <div className="shrink-0 bg-white px-4 pb-2 pt-3">
+      <div className="shrink-0 bg-white px-4 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] pt-3">
         {/* Seek bar */}
         <div className="mb-2 flex items-center gap-2">
           <span className="w-9 text-right text-[10px] font-metric text-muted">{fmtTime(currentTime)}</span>
@@ -200,6 +200,7 @@ export default function VideoDetailPage() {
             onChange={handleSeek}
             onPointerDown={() => setSeeking(true)}
             onPointerUp={() => setSeeking(false)}
+            aria-label="再生位置"
             className="h-1 flex-1 accent-primary"
           />
           <span className="w-9 text-[10px] font-metric text-muted">{fmtTime(duration)}</span>
@@ -207,17 +208,18 @@ export default function VideoDetailPage() {
 
         {/* Playback */}
         <div className="flex items-center justify-center gap-4">
-          <button type="button" onClick={() => skip(-5)} className="flex min-h-[44px] min-w-[44px] items-center justify-center text-secondary transition-colors active:text-primary">
+          <button type="button" onClick={() => skip(-5)} className="flex min-h-[44px] min-w-[44px] items-center justify-center text-secondary transition-colors active:text-primary" aria-label="5秒戻す">
             <SkipBack size={18} strokeWidth={1.5} />
           </button>
           <button
             type="button"
             onClick={togglePlay}
+            aria-label={playing ? "一時停止" : "再生"}
             className="flex h-11 w-11 items-center justify-center rounded-full bg-inverse transition-all active:scale-95"
           >
             {playing ? <Pause size={18} className="text-on-inverse" /> : <Play size={18} className="ml-0.5 text-on-inverse" />}
           </button>
-          <button type="button" onClick={() => skip(5)} className="flex min-h-[44px] min-w-[44px] items-center justify-center text-secondary transition-colors active:text-primary">
+          <button type="button" onClick={() => skip(5)} className="flex min-h-[44px] min-w-[44px] items-center justify-center text-secondary transition-colors active:text-primary" aria-label="5秒進める">
             <SkipForward size={18} strokeWidth={1.5} />
           </button>
 
@@ -226,6 +228,7 @@ export default function VideoDetailPage() {
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); setSpeedOpen((p) => !p); }}
+              aria-label={`再生速度 ${speed}倍`}
               className="rounded-full bg-surface px-3 py-1.5 text-[11px] font-metric text-secondary transition-colors active:bg-border"
             >
               {speed}x

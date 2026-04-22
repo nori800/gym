@@ -172,7 +172,7 @@ export function BodyDetail() {
         <p className="text-xs font-title uppercase tracking-[0.12em] text-muted">
           推移
         </p>
-        <svg viewBox={`0 0 ${W} ${H}`} className="mt-3 w-full" preserveAspectRatio="xMidYMid meet">
+        <svg viewBox={`0 0 ${W} ${H}`} className="mt-3 w-full" preserveAspectRatio="xMidYMid meet" role="img" aria-label={`体重推移グラフ: ${data[0].weight}kg から ${latest.weight}kg`}>
           <path d={fillPath} fill="rgba(62,237,141,0.12)" />
 
           {wAxis.steps.map((v) => (

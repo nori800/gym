@@ -7,14 +7,6 @@ import { MOCK_WORKOUT_HISTORY } from "@/lib/mocks/workoutHistory";
 import { MOCK_BODY_LOGS } from "@/lib/mocks/bodyLogs";
 import { formatJapaneseLongDate } from "@/lib/utils/formatRecordDate";
 
-function getGreeting(): string {
-  const hour = new Date().getHours();
-  if (hour < 5) return "お疲れさま";
-  if (hour < 10) return "おはよう";
-  if (hour < 17) return "今日もいこう";
-  return "おつかれさま";
-}
-
 function getSuggestedWorkout() {
   if (MOCK_WORKOUT_HISTORY.length === 0) return null;
   const categories = MOCK_WORKOUT_HISTORY.map((w) => w.categories).flat();
@@ -48,10 +40,7 @@ export default function DashboardPage() {
       {/* Header */}
       <header className="flex items-center justify-between">
         <div>
-          <p className="text-xs font-title uppercase tracking-[0.12em] text-muted">
-            FormCheck
-          </p>
-          <h1 className="mt-1 text-xl font-title tracking-tight">{getGreeting()}</h1>
+          <h1 className="text-xl font-title tracking-tight">FormCheck</h1>
         </div>
         <Link
           href="/settings"
@@ -112,8 +101,8 @@ export default function DashboardPage() {
         </section>
       )}
 
-      {/* Recent workouts */}
-      {recentWorkouts.length > 0 && (
+      {/* Recent workouts OR getting started guide */}
+      {recentWorkouts.length > 0 ? (
         <section className="space-y-3">
           <div className="flex items-center justify-between px-0.5">
             <h2 className="text-xs font-title uppercase tracking-[0.12em] text-muted">
@@ -150,6 +139,25 @@ export default function DashboardPage() {
             ))}
           </div>
         </section>
+      ) : (
+        <section className="space-y-3">
+          <h2 className="px-0.5 text-xs font-title uppercase tracking-[0.12em] text-muted">
+            はじめよう
+          </h2>
+          <div className="rounded-[18px] bg-white p-[18px] shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
+            <p className="text-sm font-bold tracking-tight">ワークアウトを始めよう</p>
+            <p className="mt-1.5 text-[13px] leading-relaxed text-secondary">
+              種目・重量・回数を記録して、トレーニングの成果を見える化できます。
+            </p>
+            <Link
+              href="/workouts/edit"
+              className="mt-4 flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-inverse text-sm font-extrabold tracking-wide text-on-inverse transition-all active:scale-[0.98]"
+            >
+              <Dumbbell size={16} strokeWidth={1.5} />
+              ワークアウトを作成
+            </Link>
+          </div>
+        </section>
       )}
 
       {/* Quick access — FormCheck feature */}
@@ -173,23 +181,21 @@ export default function DashboardPage() {
           <ChevronRight size={16} strokeWidth={1.5} className="shrink-0 text-muted" />
         </Link>
 
-        {videoCount > 0 && (
-          <Link
-            href="/videos"
-            className="flex items-center gap-3.5 rounded-[18px] bg-white px-[18px] py-4 shadow-[0_0_0_1px_rgba(0,0,0,.04)] transition-all duration-150 active:scale-[0.99]"
-          >
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-surface">
-              <TrendingUp size={18} strokeWidth={1.5} className="text-primary" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-bold tracking-tight">動画ライブラリ</p>
-              <p className="mt-0.5 text-[11px] text-secondary">
-                {videoCount}本の撮影動画
-              </p>
-            </div>
-            <ChevronRight size={16} strokeWidth={1.5} className="shrink-0 text-muted" />
-          </Link>
-        )}
+        <Link
+          href="/videos"
+          className="flex items-center gap-3.5 rounded-[18px] bg-white px-[18px] py-4 shadow-[0_0_0_1px_rgba(0,0,0,.04)] transition-all duration-150 active:scale-[0.99]"
+        >
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-surface">
+            <TrendingUp size={18} strokeWidth={1.5} className="text-primary" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-bold tracking-tight">動画ライブラリ</p>
+            <p className="mt-0.5 text-[11px] text-secondary">
+              {videoCount > 0 ? `${videoCount}本の撮影動画` : "撮影した動画をここで確認"}
+            </p>
+          </div>
+          <ChevronRight size={16} strokeWidth={1.5} className="shrink-0 text-muted" />
+        </Link>
       </section>
     </div>
   );

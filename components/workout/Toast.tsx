@@ -28,6 +28,8 @@ export function Toast({ message, visible, onDismiss, duration = 2500 }: ToastPro
 
   return (
     <div
+      role="status"
+      aria-live="polite"
       className={`fixed inset-x-0 bottom-24 z-50 flex justify-center transition-all duration-300 ${
         show ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
       }`}

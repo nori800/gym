@@ -30,9 +30,9 @@ export default function BodyPage() {
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
             <Scale size={26} strokeWidth={1.5} className="text-muted" />
           </div>
-          <p className="mt-5 text-[15px] font-bold">まだ記録がありません</p>
+          <p className="mt-5 text-[15px] font-bold">体重を記録しよう</p>
           <p className="mt-2 max-w-[240px] text-center text-sm leading-relaxed text-secondary">
-            右下の「記録する」から体重・体脂肪率を記録しましょう。推移をグラフで確認できます。
+            体重・体脂肪率を定期的に記録して、推移をグラフで確認できます。
           </p>
           <button
             type="button"

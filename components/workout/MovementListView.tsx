@@ -53,6 +53,7 @@ export function MovementListView({ selectedId, onSelect, onBack }: MovementListV
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="種目名や部位で検索"
+            aria-label="種目を検索"
             className="flex-1 bg-transparent text-sm text-primary placeholder:text-muted focus:outline-none"
           />
           {query && (

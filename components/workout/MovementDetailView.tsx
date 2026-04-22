@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowLeft, ChevronDown, ChevronUp } from "lucide-react";
-import type { Movement, MovementConfig } from "@/types/workout";
+import { ArrowLeft, ChevronDown, ChevronUp, HelpCircle } from "lucide-react";
+import type { Movement, MovementConfig, WeightMode, AssistanceType } from "@/types/workout";
+import { WEIGHT_MODES, ASSISTANCE_TYPES } from "@/types/workout";
 import { Toggle } from "./Toggle";
 import { Stepper } from "./Stepper";
 
@@ -33,6 +34,10 @@ export function MovementDetailView({
 }: MovementDetailViewProps) {
   const [segment, setSegment] = useState<Segment>("overview");
   const [setsExpanded, setSetsExpanded] = useState(true);
+  const [weightSectionExpanded, setWeightSectionExpanded] = useState(false);
+  const [assistanceSectionExpanded, setAssistanceSectionExpanded] = useState(false);
+  const [weightModeHelpOpen, setWeightModeHelpOpen] = useState(false);
+  const [assistanceHelpOpen, setAssistanceHelpOpen] = useState(false);
 
   const updateSetWeight = (i: number, v: number) => {
     const next = [...config.perSetWeight];
@@ -69,6 +74,8 @@ export function MovementDetailView({
   };
 
   const muscles = MUSCLE_MAP[movement.categoryJa] ?? [];
+  const selectedWeightMode = WEIGHT_MODES.find((m) => m.key === config.weightMode);
+  const selectedAssistance = ASSISTANCE_TYPES.find((a) => a.key === config.assistanceType);
 
   return (
     <div className="flex h-dvh flex-col bg-surface">
@@ -100,9 +107,11 @@ export function MovementDetailView({
           </div>
 
           {/* Segment tabs */}
-          <div className="flex border-b border-border">
+          <div className="flex border-b border-border" role="tablist" aria-label="種目情報">
             <button
               type="button"
+              role="tab"
+              aria-selected={segment === "overview"}
               onClick={() => setSegment("overview")}
               className={`flex-1 py-3 text-center text-[13px] font-extrabold tracking-wide transition-colors ${
                 segment === "overview"
@@ -114,6 +123,8 @@ export function MovementDetailView({
             </button>
             <button
               type="button"
+              role="tab"
+              aria-selected={segment === "muscles"}
               onClick={() => setSegment("muscles")}
               className={`flex-1 py-3 text-center text-[13px] font-extrabold tracking-wide transition-colors ${
                 segment === "muscles"
@@ -171,11 +182,170 @@ export function MovementDetailView({
           </div>
         </div>
 
+        {/* Weight modes — collapsed by default */}
+        <div className="mt-6 overflow-hidden rounded-[18px] bg-white shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
+          <button
+            type="button"
+            onClick={() => {
+              setWeightSectionExpanded((p) => {
+                const next = !p;
+                if (!next) {
+                  setWeightModeHelpOpen(false);
+                }
+                return next;
+              });
+            }}
+            className="flex min-h-[52px] w-full items-center justify-between gap-3 px-[18px] py-3 text-left transition-colors active:bg-surface"
+            aria-expanded={weightSectionExpanded}
+          >
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-title uppercase tracking-[0.12em] text-muted">ウェイトモード</p>
+              <p className="mt-0.5 truncate text-sm font-bold text-primary">
+                {selectedWeightMode?.label ?? "—"}
+              </p>
+            </div>
+            {weightSectionExpanded ? (
+              <ChevronUp size={18} strokeWidth={1.5} className="shrink-0 text-secondary" />
+            ) : (
+              <ChevronDown size={18} strokeWidth={1.5} className="shrink-0 text-secondary" />
+            )}
+          </button>
+          {weightSectionExpanded && (
+            <div className="border-t border-border px-[18px] pb-4 pt-3">
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-[12px] leading-relaxed text-secondary">
+                  セットの実施方法を選べます。迷ったら「ノーマル」でOK。
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setWeightModeHelpOpen((p) => !p)}
+                  className="shrink-0 rounded-full p-1 text-muted transition-colors active:bg-chip"
+                  aria-label="ウェイトモードの説明を開く"
+                  aria-expanded={weightModeHelpOpen}
+                >
+                  <HelpCircle size={15} strokeWidth={1.5} />
+                </button>
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                {WEIGHT_MODES.map(({ key, label }) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => onConfigChange({ ...config, weightMode: key as WeightMode })}
+                    className={`flex min-h-[44px] items-center justify-center rounded-[14px] text-[13px] font-extrabold tracking-wide transition-all duration-150 active:scale-[0.97] ${
+                      config.weightMode === key
+                        ? "bg-inverse text-on-inverse shadow-[0_2px_8px_rgba(0,0,0,0.12)]"
+                        : "bg-chip text-secondary shadow-[0_0_0_1px_rgba(0,0,0,.06)]"
+                    }`}
+                    aria-pressed={config.weightMode === key}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {selectedWeightMode && (
+                <p className="mt-2 text-[12px] leading-relaxed text-secondary">{selectedWeightMode.desc}</p>
+              )}
+              {weightModeHelpOpen && (
+                <div className="mt-3 rounded-[14px] bg-chip p-3.5 space-y-2.5">
+                  {WEIGHT_MODES.map(({ label, desc }) => (
+                    <div key={label}>
+                      <p className="text-[12px] font-bold text-primary">{label}</p>
+                      <p className="text-[11px] leading-relaxed text-secondary">{desc}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Assistance — collapsed by default */}
+        <div className="mt-3 overflow-hidden rounded-[18px] bg-white shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
+          <button
+            type="button"
+            onClick={() => {
+              setAssistanceSectionExpanded((p) => {
+                const next = !p;
+                if (!next) {
+                  setAssistanceHelpOpen(false);
+                }
+                return next;
+              });
+            }}
+            className="flex min-h-[52px] w-full items-center justify-between gap-3 px-[18px] py-3 text-left transition-colors active:bg-surface"
+            aria-expanded={assistanceSectionExpanded}
+          >
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-title uppercase tracking-[0.12em] text-muted">アシスタンス</p>
+              <p className="mt-0.5 truncate text-sm font-bold text-primary">
+                {selectedAssistance?.label ?? "—"}
+              </p>
+            </div>
+            {assistanceSectionExpanded ? (
+              <ChevronUp size={18} strokeWidth={1.5} className="shrink-0 text-secondary" />
+            ) : (
+              <ChevronDown size={18} strokeWidth={1.5} className="shrink-0 text-secondary" />
+            )}
+          </button>
+          {assistanceSectionExpanded && (
+            <div className="border-t border-border px-[18px] pb-4 pt-3">
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-[12px] leading-relaxed text-secondary">
+                  パートナーの補助を使うかどうかの記録です。
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setAssistanceHelpOpen((p) => !p)}
+                  className="shrink-0 rounded-full p-1 text-muted transition-colors active:bg-chip"
+                  aria-label="アシスタンスの説明を開く"
+                  aria-expanded={assistanceHelpOpen}
+                >
+                  <HelpCircle size={15} strokeWidth={1.5} />
+                </button>
+              </div>
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                {ASSISTANCE_TYPES.map(({ key, label }) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => onConfigChange({ ...config, assistanceType: key as AssistanceType })}
+                    className={`flex min-h-[44px] items-center justify-center rounded-[14px] text-[13px] font-extrabold tracking-wide transition-all duration-150 active:scale-[0.97] ${
+                      config.assistanceType === key
+                        ? "bg-inverse text-on-inverse shadow-[0_2px_8px_rgba(0,0,0,0.12)]"
+                        : "bg-chip text-secondary shadow-[0_0_0_1px_rgba(0,0,0,.06)]"
+                    }`}
+                    aria-pressed={config.assistanceType === key}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {selectedAssistance && (
+                <p className="mt-2 text-[12px] leading-relaxed text-secondary">{selectedAssistance.desc}</p>
+              )}
+              {assistanceHelpOpen && (
+                <div className="mt-3 rounded-[14px] bg-chip p-3.5 space-y-2.5">
+                  {ASSISTANCE_TYPES.map(({ label, desc }) => (
+                    <div key={label}>
+                      <p className="text-[12px] font-bold text-primary">{label}</p>
+                      <p className="text-[11px] leading-relaxed text-secondary">{desc}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* Sets & Reps section heading */}
         <div className="mt-6 px-[18px]">
           <h4 className="text-xs font-title uppercase tracking-wider text-primary">
             セット & レップス
           </h4>
+          <p className="mt-1 text-[12px] leading-relaxed text-secondary">
+            セット＝同じ動作の繰り返しを1まとまりにした単位。レップ（回数）＝1セット内で動作を行う回数です。例: 10回 × 3セット = 合計30回。
+          </p>
         </div>
 
         {/* Set count control */}

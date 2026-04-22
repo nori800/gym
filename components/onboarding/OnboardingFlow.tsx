@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { Dumbbell, Camera, TrendingUp, ChevronRight } from "lucide-react";
+import { FocusTrap } from "@/components/common/FocusTrap";
 
 const STEPS = [
   {
@@ -46,7 +47,8 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
   }, [onComplete]);
 
   return (
-    <div className="fixed inset-0 z-[200] flex flex-col bg-white">
+    <FocusTrap>
+    <div className="fixed inset-0 z-[200] flex flex-col bg-white" role="dialog" aria-modal="true" aria-label="FormCheck へようこそ">
       <div className="flex flex-1 flex-col items-center justify-center px-8">
         {/* Icon */}
         <div
@@ -68,16 +70,18 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
         </p>
 
         {/* Progress dots */}
-        <div className="mt-10 flex gap-2">
+        <div className="mt-10 flex gap-2" role="group" aria-label="進捗">
           {STEPS.map((_, i) => (
             <span
               key={i}
               className={`h-1.5 rounded-full transition-all duration-300 ${
                 i === step ? "w-6 bg-primary" : "w-1.5 bg-border"
               }`}
+              aria-hidden="true"
             />
           ))}
         </div>
+        <span className="sr-only">{step + 1} / {STEPS.length}</span>
       </div>
 
       {/* Bottom actions */}
@@ -107,5 +111,6 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
         )}
       </div>
     </div>
+    </FocusTrap>
   );
 }

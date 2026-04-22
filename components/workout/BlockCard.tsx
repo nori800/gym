@@ -26,7 +26,8 @@ export function BlockCard({ block, onAddMove }: BlockCardProps) {
         <button
           type="button"
           className="flex h-8 w-8 items-center justify-center text-on-inverse/50 transition-colors active:text-on-inverse"
-          aria-label="ブロックメニュー"
+          aria-label="ブロックオプション（準備中）"
+          aria-disabled="true"
         >
           ···
         </button>

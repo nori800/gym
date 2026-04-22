@@ -3,19 +3,27 @@
 import { useState } from "react";
 import { X } from "lucide-react";
 import { PrimaryRecordButton } from "@/components/common/PrimaryRecordButton";
+import { DatePickerField } from "@/components/common/DatePickerField";
 
 type BodyLogFormProps = {
   onClose: () => void;
   onSaved?: () => void;
 };
 
+function getTodayString() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export function BodyLogForm({ onClose, onSaved }: BodyLogFormProps) {
+  const [date, setDate] = useState(getTodayString);
   const [weight, setWeight] = useState("");
   const [fat, setFat] = useState("");
 
   const handleSave = () => {
     if (!weight) return;
     console.log("body log", {
+      log_date: date,
       weight: parseFloat(weight),
       body_fat: fat ? parseFloat(fat) : null,
     });
@@ -45,7 +53,11 @@ export function BodyLogForm({ onClose, onSaved }: BodyLogFormProps) {
         </button>
       </div>
 
-      <div className="mt-5 overflow-hidden rounded-[18px] bg-surface shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
+      <div className="mt-5">
+        <DatePickerField value={date} onChange={setDate} aria-label="記録する日を選択" />
+      </div>
+
+      <div className="mt-3 overflow-hidden rounded-[18px] bg-surface shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
         <div className="flex min-h-[62px] items-center justify-between border-b border-border px-[18px]">
           <label htmlFor="weight-input" className="text-lg font-semibold">体重</label>
           <div className="flex items-baseline gap-1">

@@ -2,7 +2,9 @@
 
 import { useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { X, Pencil, HelpCircle } from "lucide-react";
+import { X, Pencil, HelpCircle, Camera } from "lucide-react";
+import Link from "next/link";
+import { DatePickerField } from "@/components/common/DatePickerField";
 import type { MovementConfig, WorkoutDraft } from "@/types/workout";
 import { createDefaultConfig, createEmptyBlock } from "@/types/workout";
 import { getMovementById } from "@/lib/mocks/movements";
@@ -23,11 +25,16 @@ export default function WorkoutEditPage() {
   const router = useRouter();
   const transitionRef = useRef<TransitionDir>("none");
 
-  const [draft, setDraft] = useState<WorkoutDraft>(() => ({
-    title: "マイワークアウト",
-    description: "",
-    blocks: [createEmptyBlock(0)],
-  }));
+  const [draft, setDraft] = useState<WorkoutDraft>(() => {
+    const d = new Date();
+    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    return {
+      title: "マイワークアウト",
+      date: today,
+      description: "",
+      blocks: [createEmptyBlock(0)],
+    };
+  });
 
   const [view, setView] = useState<View>({ screen: "editor" });
   const [activeBlockIndex, setActiveBlockIndex] = useState(0);
@@ -111,7 +118,7 @@ export default function WorkoutEditPage() {
   /* ── Render: Movement List ── */
   if (view.screen === "list") {
     return (
-      <div key={transitionKey} className={animClass}>
+      <div key={transitionKey} className={`fixed inset-0 z-40 ${animClass}`}>
         <MovementListView
           selectedId={selectedMovementId}
           onSelect={handleSelectMovement}
@@ -126,7 +133,7 @@ export default function WorkoutEditPage() {
     const movement = getMovementById(view.movementId);
     if (!movement) return null;
     return (
-      <div key={transitionKey} className={animClass}>
+      <div key={transitionKey} className={`fixed inset-0 z-40 ${animClass}`}>
         <MovementDetailView
           movement={movement}
           config={currentConfig}
@@ -142,7 +149,7 @@ export default function WorkoutEditPage() {
   const totalMovements = draft.blocks.reduce((acc, b) => acc + b.movements.length, 0);
 
   return (
-    <div key={transitionKey} className={`min-h-dvh bg-surface ${animClass}`}>
+    <div key={transitionKey} className={`bg-surface ${animClass}`}>
       <div className="px-5 pb-10 pt-3">
         {/* Top bar */}
         <div className="flex items-center justify-between">
@@ -198,23 +205,36 @@ export default function WorkoutEditPage() {
           </p>
         </div>
 
-        {/* Block help — beginner guidance */}
-        {!hasAddedMovement && (
-          <button
-            type="button"
-            onClick={() => setBlockExplainerOpen(true)}
-            className="mt-4 flex w-full items-center gap-3 rounded-[14px] border border-accent/30 bg-accent/5 px-4 py-3 text-left transition-colors active:bg-accent/10"
-          >
-            <HelpCircle size={18} strokeWidth={1.5} className="shrink-0 text-accent" />
-            <span className="text-[13px] font-bold text-primary">
-              ブロックって何？
-              <span className="ml-1 font-normal text-secondary">— タップして確認</span>
-            </span>
-          </button>
-        )}
+        {/* Date — custom picker (no native calendar UI) */}
+        <div className="mt-4">
+          <DatePickerField
+            value={draft.date}
+            onChange={(iso) => setDraft((d) => ({ ...d, date: iso }))}
+            aria-label="ワークアウトの日付を選択"
+          />
+        </div>
+
+        {/* Blocks heading */}
+        <div className="mt-6 px-[18px]">
+          <div className="flex items-center gap-1.5">
+            <h4 className="text-xs font-title uppercase tracking-wider text-primary">
+              ブロック
+            </h4>
+            <button
+              type="button"
+              onClick={() => setBlockExplainerOpen(true)}
+              aria-label="ブロックの説明を見る"
+            >
+              <HelpCircle size={13} strokeWidth={1.5} className="text-muted" />
+            </button>
+          </div>
+          <p className="mt-1 text-[12px] leading-relaxed text-secondary">
+            種目をグループ化する単位です。1ブロック1種目でもOK。
+          </p>
+        </div>
 
         {/* Blocks */}
-        <div className="mt-6 space-y-5">
+        <div className="mt-3 space-y-5">
           {draft.blocks.map((block, i) => (
             <BlockCard key={block.id} block={block} onAddMove={() => handleAddMove(i)} />
           ))}
@@ -222,14 +242,32 @@ export default function WorkoutEditPage() {
 
         {/* Add block */}
         {hasAddedMovement && (
-          <button
-            type="button"
-            onClick={handleAddBlock}
-            className="mt-5 flex w-full items-center justify-center gap-2 rounded border-2 border-dashed border-[#d0d0d0] bg-white py-5 text-sm font-extrabold text-secondary transition-all duration-150 active:scale-[0.99] active:bg-surface"
-          >
-            <span className="text-lg leading-none">+</span>
-            ブロックを追加
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={handleAddBlock}
+              className="mt-5 flex w-full items-center justify-center gap-2 rounded border-2 border-dashed border-[#d0d0d0] bg-white py-5 text-sm font-extrabold text-secondary transition-all duration-150 active:scale-[0.99] active:bg-surface"
+            >
+              <span className="text-lg leading-none">+</span>
+              ブロックを追加
+            </button>
+
+            {/* Capture CTA — bridges workout and form-check */}
+            <Link
+              href="/capture"
+              className="mt-4 flex items-center gap-3.5 rounded-[18px] bg-white px-[18px] py-4 shadow-[0_0_0_1px_rgba(0,0,0,.04)] transition-all duration-150 active:scale-[0.99]"
+            >
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-accent/10">
+                <Camera size={18} strokeWidth={1.5} className="text-primary" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold tracking-tight">フォームを撮影する</p>
+                <p className="mt-0.5 text-[11px] text-secondary">
+                  このワークアウトのセットを動画で記録
+                </p>
+              </div>
+            </Link>
+          </>
         )}
       </div>
 

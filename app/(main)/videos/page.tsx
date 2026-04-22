@@ -64,6 +64,7 @@ function VideosPageInner() {
           <select
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
+            aria-label="種目でフィルター"
             className="h-9 w-full appearance-none rounded-lg border border-border bg-white px-3 pr-8 text-xs text-primary focus:outline-none focus:ring-2 focus:ring-primary/10"
           >
             <option value="all">すべて</option>
@@ -79,6 +80,7 @@ function VideosPageInner() {
           <select
             value={sort}
             onChange={(e) => setSort(e.target.value as SortKey)}
+            aria-label="並び替え"
             className="h-9 appearance-none rounded-lg border border-border bg-white px-3 pr-8 text-xs text-primary focus:outline-none focus:ring-2 focus:ring-primary/10"
           >
             <option value="newest">新しい順</option>
@@ -93,11 +95,11 @@ function VideosPageInner() {
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
             <VideoIcon size={26} strokeWidth={1.5} className="text-muted" />
           </div>
-          <p className="mt-5 text-[15px] font-bold">動画がありません</p>
+          <p className="mt-5 text-[15px] font-bold">フォームを撮影しよう</p>
           <p className="mt-2 max-w-[240px] text-center text-sm leading-relaxed text-secondary">
             {sessionFilter
-              ? "このセッションに紐付いた動画はまだありません。撮影タブからフォームを録画してみましょう。"
-              : "撮影タブからフォームを録画して、動画ライブラリに追加しましょう。"}
+              ? "このセッションの撮影動画はまだありません。"
+              : "トレーニング中のフォームを録画して、自分の動きを客観的にチェックできます。"}
           </p>
           <Link
             href="/capture"
