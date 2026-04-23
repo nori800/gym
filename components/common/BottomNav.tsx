@@ -1,8 +1,10 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Camera, Dumbbell, Scale, Film } from "lucide-react";
+import { Home, Camera, Dumbbell, Scale, Film, Users } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
 const NAV_LEFT = [
   { href: "/dashboard", label: "ホーム", icon: Home, match: ["/dashboard"] },
@@ -16,9 +18,14 @@ const NAV_CENTER = {
   match: ["/capture"],
 } as const;
 
-const NAV_RIGHT = [
+const NAV_RIGHT_DEFAULT = [
   { href: "/videos", label: "動画", icon: Film, match: ["/videos"] },
   { href: "/body", label: "ボディ", icon: Scale, match: ["/body"] },
+] as const;
+
+const NAV_RIGHT_TRAINER = [
+  { href: "/videos", label: "動画", icon: Film, match: ["/videos"] },
+  { href: "/trainer", label: "トレーナー", icon: Users, match: ["/trainer"] },
 ] as const;
 
 function isPathActive(pathname: string, match: readonly string[]) {
@@ -68,10 +75,40 @@ function TabItem({
   );
 }
 
-export function BottomNav() {
+export function BottomNav({ userRole }: { userRole?: string }) {
   const pathname = usePathname();
   const captureActive = isPathActive(pathname, NAV_CENTER.match);
   const Icon = NAV_CENTER.icon;
+
+  const [resolvedRole, setResolvedRole] = useState<string | null>(userRole ?? null);
+
+  useEffect(() => {
+    if (userRole !== undefined) {
+      setResolvedRole(userRole);
+      return;
+    }
+
+    let cancelled = false;
+    const supabase = createClient();
+
+    supabase.auth.getUser().then(({ data }) => {
+      if (cancelled || !data.user) return;
+      supabase
+        .from("profiles")
+        .select("role")
+        .eq("user_id", data.user.id)
+        .single()
+        .then(({ data: profile }) => {
+          if (!cancelled) setResolvedRole(profile?.role ?? null);
+        });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userRole]);
+
+  const navRight = resolvedRole === "trainer" ? NAV_RIGHT_TRAINER : NAV_RIGHT_DEFAULT;
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-app pb-[env(safe-area-inset-bottom,0px)]">
@@ -103,7 +140,7 @@ export function BottomNav() {
           </span>
         </div>
 
-        {NAV_RIGHT.map((item) => (
+        {navRight.map((item) => (
           <TabItem key={item.href} {...item} pathname={pathname} />
         ))}
       </div>

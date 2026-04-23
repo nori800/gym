@@ -16,6 +16,7 @@ export default function CapturePage() {
   const streamRef = useRef<MediaStream | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const recordedUrlRef = useRef<string | null>(null);
 
   const [state, setState] = useState<CaptureState>("idle");
   const [gridOn, setGridOn] = useState(true);
@@ -25,13 +26,25 @@ export default function CapturePage() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
 
+  const setRecordedUrlTracked = useCallback((url: string | null) => {
+    recordedUrlRef.current = url;
+    setRecordedUrl(url);
+  }, []);
+
+  const revokeRecordedUrl = useCallback(() => {
+    if (recordedUrlRef.current) {
+      URL.revokeObjectURL(recordedUrlRef.current);
+      recordedUrlRef.current = null;
+    }
+  }, []);
+
   const startCamera = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: "environment",
-          width: { ideal: 1920, min: 1280 },
-          height: { ideal: 1080, min: 720 },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
           frameRate: { ideal: 30 },
         },
         audio: true,
@@ -53,7 +66,7 @@ export default function CapturePage() {
     return () => {
       streamRef.current?.getTracks().forEach((t) => t.stop());
       if (timerRef.current) clearInterval(timerRef.current);
-      if (recordedUrl) URL.revokeObjectURL(recordedUrl);
+      if (recordedUrlRef.current) URL.revokeObjectURL(recordedUrlRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -72,7 +85,7 @@ export default function CapturePage() {
     recorder.onstop = () => {
       const blob = new Blob(chunksRef.current, { type: mimeType });
       const url = URL.createObjectURL(blob);
-      setRecordedUrl(url);
+      setRecordedUrlTracked(url);
       setState("recorded");
       setIsPlaying(false);
       streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -82,7 +95,7 @@ export default function CapturePage() {
     setState("recording");
     setElapsed(0);
     timerRef.current = setInterval(() => setElapsed((p) => p + 1), 1000);
-  }, []);
+  }, [setRecordedUrlTracked]);
 
   const stopRecording = useCallback(() => {
     recorderRef.current?.stop();
@@ -93,12 +106,12 @@ export default function CapturePage() {
   }, []);
 
   const retake = useCallback(() => {
-    if (recordedUrl) URL.revokeObjectURL(recordedUrl);
-    setRecordedUrl(null);
+    revokeRecordedUrl();
+    setRecordedUrlTracked(null);
     setElapsed(0);
     setIsPlaying(false);
     startCamera();
-  }, [recordedUrl, startCamera]);
+  }, [revokeRecordedUrl, setRecordedUrlTracked, startCamera]);
 
   const proceed = useCallback(() => {
     if (recordedUrl) {
@@ -115,14 +128,15 @@ export default function CapturePage() {
     input.onchange = (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
+      revokeRecordedUrl();
       const url = URL.createObjectURL(file);
-      setRecordedUrl(url);
+      setRecordedUrlTracked(url);
       setState("recorded");
       setIsPlaying(false);
       streamRef.current?.getTracks().forEach((t) => t.stop());
     };
     input.click();
-  }, []);
+  }, [revokeRecordedUrl, setRecordedUrlTracked]);
 
   const togglePlayback = useCallback(() => {
     const video = previewRef.current;
@@ -186,7 +200,6 @@ export default function CapturePage() {
               muted
               onEnded={() => setIsPlaying(false)}
             />
-            {/* Play/Pause overlay */}
             <button
               type="button"
               onClick={togglePlayback}
@@ -221,7 +234,6 @@ export default function CapturePage() {
 
         {/* Top controls */}
         <div className="absolute left-0 right-0 top-0 z-10 flex items-center justify-between px-4 pt-[max(0.75rem,env(safe-area-inset-top,16px))]">
-          {/* Left: back / library */}
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -235,6 +247,7 @@ export default function CapturePage() {
               <button
                 type="button"
                 onClick={handleLibrary}
+                aria-label="ライブラリから動画を選択"
                 className="flex items-center gap-1.5 rounded-full bg-black/50 px-3 py-1.5 text-[11px] font-semibold text-white backdrop-blur-sm"
               >
                 <Upload size={13} strokeWidth={1.5} />
@@ -243,11 +256,11 @@ export default function CapturePage() {
             )}
           </div>
 
-          {/* Right: grid toggle */}
           {state !== "recorded" && (
             <button
               type="button"
               onClick={() => setGridOn((p) => !p)}
+              aria-label="グリッド表示の切り替え"
               className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold backdrop-blur-sm ${
                 gridOn ? "bg-white/25 text-white" : "bg-black/50 text-white/70"
               }`}

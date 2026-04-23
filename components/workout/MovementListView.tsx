@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { ArrowLeft, Search, X } from "lucide-react";
+import { ArrowLeft, Search, X, Plus } from "lucide-react";
 import type { Movement } from "@/types/workout";
 import { searchMovements, getMovementsByCategory } from "@/lib/mocks/movements";
 
@@ -9,13 +9,26 @@ interface MovementListViewProps {
   selectedId: string | null;
   onSelect: (movement: Movement) => void;
   onBack: () => void;
+  customMovements?: Movement[];
+  onAddCustomMovement?: (m: { nameJa: string; categoryJa: string; descJa: string }) => void;
 }
 
-const CATEGORIES = ["すべて", "胸", "背中", "肩", "腕", "脚"];
+const CATEGORIES = ["すべて", "胸", "背中", "肩", "腕", "脚", "腹", "全身"];
+const CATEGORY_OPTIONS = CATEGORIES.filter((c) => c !== "すべて");
 
-export function MovementListView({ selectedId, onSelect, onBack }: MovementListViewProps) {
+export function MovementListView({
+  selectedId,
+  onSelect,
+  onBack,
+  customMovements,
+  onAddCustomMovement,
+}: MovementListViewProps) {
   const [query, setQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState("すべて");
+  const [showCustomForm, setShowCustomForm] = useState(false);
+  const [customName, setCustomName] = useState("");
+  const [customCategory, setCustomCategory] = useState("胸");
+  const [customDesc, setCustomDesc] = useState("");
 
   const results = useMemo(() => {
     const searched = searchMovements(query);
@@ -27,6 +40,31 @@ export function MovementListView({ selectedId, onSelect, onBack }: MovementListV
     if (query || activeCategory !== "すべて") return null;
     return getMovementsByCategory();
   }, [query, activeCategory]);
+
+  const filteredCustom = useMemo(() => {
+    if (!customMovements?.length) return [];
+    let list = customMovements;
+    if (query.trim()) {
+      const q = query.toLowerCase();
+      list = list.filter(
+        (m) => m.nameJa.includes(q) || m.descJa.includes(q) || m.categoryJa.includes(q),
+      );
+    }
+    if (activeCategory !== "すべて") {
+      list = list.filter((m) => m.categoryJa === activeCategory);
+    }
+    return list;
+  }, [customMovements, query, activeCategory]);
+
+  function handleAddCustom() {
+    const name = customName.trim();
+    if (!name || !onAddCustomMovement) return;
+    onAddCustomMovement({ nameJa: name, categoryJa: customCategory, descJa: customDesc.trim() });
+    setCustomName("");
+    setCustomDesc("");
+    setCustomCategory("胸");
+    setShowCustomForm(false);
+  }
 
   return (
     <div className="flex h-dvh flex-col bg-surface">
@@ -91,6 +129,96 @@ export function MovementListView({ selectedId, onSelect, onBack }: MovementListV
 
       {/* Movement list */}
       <div className="flex-1 overflow-y-auto px-5 pb-6 pt-1">
+        {/* Custom movement section */}
+        {onAddCustomMovement && (
+          <div className="mt-2">
+            {!showCustomForm ? (
+              <button
+                type="button"
+                onClick={() => setShowCustomForm(true)}
+                className="flex w-full items-center gap-2.5 rounded-[18px] bg-white px-4 py-3 text-left shadow-[0_0_0_1px_rgba(0,0,0,.04)] transition-all duration-100 active:bg-surface"
+              >
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-inverse/5">
+                  <Plus size={16} strokeWidth={2} className="text-primary" />
+                </div>
+                <span className="text-[15px] font-bold tracking-tight">カスタム種目を追加</span>
+              </button>
+            ) : (
+              <div className="overflow-hidden rounded-[18px] bg-white p-4 shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
+                <div className="mb-3 text-xs font-bold uppercase tracking-wider text-primary">
+                  カスタム種目を追加
+                </div>
+                <div className="space-y-2.5">
+                  <input
+                    type="text"
+                    value={customName}
+                    onChange={(e) => setCustomName(e.target.value)}
+                    placeholder="種目名"
+                    className="w-full rounded-xl border border-border bg-surface px-3 py-2 text-sm text-primary placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-inverse/20"
+                  />
+                  <select
+                    value={customCategory}
+                    onChange={(e) => setCustomCategory(e.target.value)}
+                    className="w-full appearance-none rounded-xl border border-border bg-surface px-3 py-2 text-sm text-primary focus:outline-none focus:ring-2 focus:ring-inverse/20"
+                  >
+                    {CATEGORY_OPTIONS.map((cat) => (
+                      <option key={cat} value={cat}>
+                        {cat}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    type="text"
+                    value={customDesc}
+                    onChange={(e) => setCustomDesc(e.target.value)}
+                    placeholder="説明（任意）"
+                    className="w-full rounded-xl border border-border bg-surface px-3 py-2 text-sm text-primary placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-inverse/20"
+                  />
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setShowCustomForm(false)}
+                      className="flex-1 rounded-xl bg-surface py-2 text-sm font-bold text-secondary transition-colors active:bg-chip"
+                    >
+                      キャンセル
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleAddCustom}
+                      disabled={!customName.trim()}
+                      className="flex-1 rounded-xl bg-inverse py-2 text-sm font-bold text-on-inverse transition-all active:scale-[0.98] disabled:opacity-40"
+                    >
+                      追加
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Custom movements list */}
+        {filteredCustom.length > 0 && (
+          <div className="mt-4">
+            <div className="mb-1.5 px-1 text-xs font-title uppercase tracking-wider text-primary">
+              カスタム種目
+            </div>
+            <div className="overflow-hidden rounded-[18px] bg-white shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
+              {filteredCustom.map((m, i) => (
+                <MovementRow
+                  key={m.id}
+                  movement={m}
+                  isSelected={m.id === selectedId}
+                  hasBorder={i > 0}
+                  onSelect={() => onSelect(m)}
+                  isCustom
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Built-in movements */}
         {grouped ? (
           Array.from(grouped.entries()).map(([category, movements]) => {
             if (movements.length === 0) return null;
@@ -142,11 +270,13 @@ function MovementRow({
   isSelected,
   hasBorder,
   onSelect,
+  isCustom,
 }: {
   movement: Movement;
   isSelected: boolean;
   hasBorder: boolean;
   onSelect: () => void;
+  isCustom?: boolean;
 }) {
   return (
     <button
@@ -162,7 +292,14 @@ function MovementRow({
       </div>
 
       <div className="min-w-0 py-2">
-        <span className="block text-[17px] font-bold tracking-tight">{movement.nameJa}</span>
+        <span className="block text-[17px] font-bold tracking-tight">
+          {movement.nameJa}
+          {isCustom && (
+            <span className="ml-1.5 inline-block rounded-full bg-inverse/10 px-1.5 py-0.5 align-middle text-[10px] font-extrabold text-secondary">
+              カスタム
+            </span>
+          )}
+        </span>
         <span className="mt-0.5 block truncate text-[12px] text-secondary">
           {movement.descJa}
         </span>

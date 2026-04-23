@@ -2,14 +2,27 @@
 
 import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
-import { PenSquare, Dumbbell, Video, X, Camera, Loader2 } from "lucide-react";
-import { MOCK_WORKOUT_HISTORY, type WorkoutHistoryEntry } from "@/lib/mocks/workoutHistory";
-import { MOCK_VIDEOS } from "@/lib/mocks/videos";
+import { useRouter } from "next/navigation";
+import { PenSquare, Dumbbell, Video, X, Camera, Loader2, Trash2, Pencil, LogIn } from "lucide-react";
 import { RecordDateBlock } from "@/components/common/RecordDateBlock";
 import { FocusTrap } from "@/components/common/FocusTrap";
+import { AppToast } from "@/components/common/AppToast";
 import { useAuth } from "@/lib/hooks/useAuth";
+import { useToast } from "@/lib/hooks/useToast";
 import { createClient } from "@/lib/supabase/client";
 import type { Json } from "@/types/database.types";
+
+type WorkoutHistoryEntry = {
+  id: string;
+  title: string;
+  date: string;
+  totalSets: number;
+  totalReps: number;
+  totalVolume: number;
+  durationMin: number;
+  categories: string[];
+  movements: { name: string; sets: number; reps: number; weight: number }[];
+};
 
 function rowToEntry(row: {
   id: string;
@@ -49,14 +62,16 @@ function rowToEntry(row: {
 
 export default function WorkoutsPage() {
   const { user, loading: authLoading } = useAuth();
+  const { toast, show: showToast, dismiss: dismissToast } = useToast();
   const [history, setHistory] = useState<WorkoutHistoryEntry[]>([]);
+  const [videoCounts, setVideoCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [detailEntry, setDetailEntry] = useState<WorkoutHistoryEntry | null>(null);
 
   useEffect(() => {
     if (authLoading) return;
     if (!user) {
-      setHistory(MOCK_WORKOUT_HISTORY);
+      setHistory([]);
       setLoading(false);
       return;
     }
@@ -66,15 +81,58 @@ export default function WorkoutsPage() {
       .select("*")
       .eq("user_id", user.id)
       .order("workout_date", { ascending: false })
-      .then(({ data }) => {
-        if (data && data.length > 0) {
-          setHistory(data.map(rowToEntry));
-        } else {
-          setHistory(MOCK_WORKOUT_HISTORY);
+      .then(({ data, error }) => {
+        if (error) {
+          showToast("ワークアウトの読み込みに失敗しました", "error");
+          setLoading(false);
+          return;
         }
+        const entries = (data ?? []).map(rowToEntry);
+        setHistory(entries);
         setLoading(false);
+
+        if (entries.length > 0) {
+          fetchVideoCounts(entries.map((e) => e.id));
+        }
       });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, authLoading]);
+
+  const fetchVideoCounts = useCallback(async (workoutIds: string[]) => {
+    if (workoutIds.length === 0) return;
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("videos")
+      .select("workout_id")
+      .in("workout_id", workoutIds);
+
+    if (!data) return;
+    const counts: Record<string, number> = {};
+    for (const row of data) {
+      if (row.workout_id) {
+        counts[row.workout_id] = (counts[row.workout_id] ?? 0) + 1;
+      }
+    }
+    setVideoCounts(counts);
+  }, []);
+
+  const handleDelete = useCallback(async (entryId: string) => {
+    if (!user) return;
+    const ok = window.confirm("このワークアウトを削除しますか？この操作は取り消せません。");
+    if (!ok) return;
+
+    const supabase = createClient();
+    const { error } = await supabase.from("workouts").delete().eq("id", entryId);
+
+    if (error) {
+      showToast("削除に失敗しました", "error");
+      return;
+    }
+
+    setHistory((prev) => prev.filter((e) => e.id !== entryId));
+    setDetailEntry(null);
+    showToast("ワークアウトを削除しました", "success");
+  }, [user, showToast]);
 
   if (loading || authLoading) {
     return (
@@ -93,15 +151,23 @@ export default function WorkoutsPage() {
           <p className="text-xs font-title uppercase tracking-[0.12em] text-muted">Workouts</p>
           <h1 className="mt-1 text-xl font-title tracking-tight">ワークアウト履歴</h1>
         </div>
-        <p className="pb-1 text-xs font-caption text-muted">全 {history.length} 件</p>
+        {!isEmpty && <p className="pb-1 text-xs font-caption text-muted">全 {history.length} 件</p>}
       </header>
 
-      {isEmpty ? (
+      {!user ? (
+        <GuestPrompt />
+      ) : isEmpty ? (
         <EmptyState />
       ) : (
         <div className="mt-6 space-y-3">
           {history.map((entry, i) => (
-            <HistoryCard key={entry.id} entry={entry} isLatest={i === 0} onTap={() => setDetailEntry(entry)} />
+            <HistoryCard
+              key={entry.id}
+              entry={entry}
+              isLatest={i === 0}
+              videoCount={videoCounts[entry.id] ?? 0}
+              onTap={() => setDetailEntry(entry)}
+            />
           ))}
         </div>
       )}
@@ -115,7 +181,41 @@ export default function WorkoutsPage() {
         新規作成
       </Link>
 
-      {detailEntry && <WorkoutDetailSheet entry={detailEntry} onClose={() => setDetailEntry(null)} />}
+      {detailEntry && (
+        <WorkoutDetailSheet
+          entry={detailEntry}
+          videoCount={videoCounts[detailEntry.id] ?? 0}
+          onClose={() => setDetailEntry(null)}
+          onDelete={handleDelete}
+        />
+      )}
+
+      <AppToast toast={toast} onDismiss={dismissToast} />
+    </div>
+  );
+}
+
+function GuestPrompt() {
+  return (
+    <div className="mt-8 rounded-[18px] bg-white p-6 shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
+      <div className="flex items-center gap-3">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-chip">
+          <LogIn size={20} strokeWidth={1.5} className="text-muted" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-[15px] font-bold tracking-tight">ログインして記録を開始</p>
+          <p className="mt-1 text-sm leading-relaxed text-secondary">
+            ワークアウトの記録・履歴の確認にはログインが必要です。
+          </p>
+        </div>
+      </div>
+      <Link
+        href="/login"
+        className="mt-5 flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-inverse px-5 py-2.5 text-sm font-extrabold tracking-wide text-on-inverse transition-all active:scale-[0.98]"
+      >
+        <LogIn size={14} strokeWidth={2} />
+        ログイン
+      </Link>
     </div>
   );
 }
@@ -141,9 +241,17 @@ function EmptyState() {
   );
 }
 
-function HistoryCard({ entry, isLatest, onTap }: { entry: WorkoutHistoryEntry; isLatest: boolean; onTap: () => void }) {
-  const videoCount = MOCK_VIDEOS.filter((v) => v.workout_session_id === entry.id).length;
-
+function HistoryCard({
+  entry,
+  isLatest,
+  videoCount,
+  onTap,
+}: {
+  entry: WorkoutHistoryEntry;
+  isLatest: boolean;
+  videoCount: number;
+  onTap: () => void;
+}) {
   return (
     <article
       role="button"
@@ -192,9 +300,31 @@ function HistoryCard({ entry, isLatest, onTap }: { entry: WorkoutHistoryEntry; i
   );
 }
 
-function WorkoutDetailSheet({ entry, onClose }: { entry: WorkoutHistoryEntry; onClose: () => void }) {
-  const videoCount = MOCK_VIDEOS.filter((v) => v.workout_session_id === entry.id).length;
+function WorkoutDetailSheet({
+  entry,
+  videoCount,
+  onClose,
+  onDelete,
+}: {
+  entry: WorkoutHistoryEntry;
+  videoCount: number;
+  onClose: () => void;
+  onDelete: (id: string) => void;
+}) {
+  const router = useRouter();
+  const [deleting, setDeleting] = useState(false);
   const handleBackdropClick = useCallback(() => onClose(), [onClose]);
+
+  const handleEdit = useCallback(() => {
+    onClose();
+    router.push(`/workouts/edit?id=${entry.id}`);
+  }, [entry.id, router, onClose]);
+
+  const handleDelete = useCallback(async () => {
+    setDeleting(true);
+    await onDelete(entry.id);
+    setDeleting(false);
+  }, [entry.id, onDelete]);
 
   return (
     <>
@@ -239,6 +369,27 @@ function WorkoutDetailSheet({ entry, onClose }: { entry: WorkoutHistoryEntry; on
                 {entry.categories.map((c) => (
                   <span key={c} className="rounded-full bg-chip px-3 py-1.5 text-[11px] font-extrabold text-secondary">{c}</span>
                 ))}
+              </div>
+
+              {/* Action buttons */}
+              <div className="mt-5 flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleEdit}
+                  className="flex flex-1 min-h-[44px] items-center justify-center gap-2 rounded-xl bg-inverse text-sm font-extrabold tracking-wide text-on-inverse transition-all active:scale-[0.98]"
+                >
+                  <Pencil size={14} strokeWidth={2} />
+                  編集
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-danger/10 px-5 text-sm font-extrabold text-danger transition-all active:scale-[0.98] disabled:opacity-60"
+                >
+                  {deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} strokeWidth={2} />}
+                  削除
+                </button>
               </div>
             </div>
           </div>

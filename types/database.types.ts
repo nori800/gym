@@ -11,6 +11,10 @@ export interface Database {
           height: number | null;
           weight: number | null;
           goal: string | null;
+          dominant_side: string | null;
+          favorite_exercises: string[];
+          role: string | null;
+          trainer_id: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -21,6 +25,10 @@ export interface Database {
           height?: number | null;
           weight?: number | null;
           goal?: string | null;
+          dominant_side?: string | null;
+          favorite_exercises?: string[];
+          role?: string | null;
+          trainer_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -31,6 +39,10 @@ export interface Database {
           height?: number | null;
           weight?: number | null;
           goal?: string | null;
+          dominant_side?: string | null;
+          favorite_exercises?: string[];
+          role?: string | null;
+          trainer_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -153,6 +165,144 @@ export interface Database {
           workout_id?: string | null;
           created_at?: string;
           updated_at?: string;
+        };
+        Relationships: [];
+      };
+      video_annotations: {
+        Row: {
+          id: string;
+          video_id: string;
+          user_id: string;
+          frame_time: number | null;
+          grid_settings: Json;
+          drawing_shapes: Json;
+          overlay_color: string | null;
+          overlay_thickness: number | null;
+          overlay_opacity: number | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          video_id: string;
+          user_id: string;
+          frame_time?: number | null;
+          grid_settings?: Json;
+          drawing_shapes?: Json;
+          overlay_color?: string | null;
+          overlay_thickness?: number | null;
+          overlay_opacity?: number | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          video_id?: string;
+          user_id?: string;
+          frame_time?: number | null;
+          grid_settings?: Json;
+          drawing_shapes?: Json;
+          overlay_color?: string | null;
+          overlay_thickness?: number | null;
+          overlay_opacity?: number | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      workout_templates: {
+        Row: {
+          id: string;
+          user_id: string;
+          title: string;
+          blocks_json: Json;
+          categories: string[];
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          title?: string;
+          blocks_json?: Json;
+          categories?: string[];
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          title?: string;
+          blocks_json?: Json;
+          categories?: string[];
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      custom_movements: {
+        Row: {
+          id: string;
+          user_id: string;
+          name_ja: string;
+          desc_ja: string | null;
+          category_ja: string;
+          default_reps: number | null;
+          default_sets: number | null;
+          default_weight: number | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          name_ja: string;
+          desc_ja?: string | null;
+          category_ja: string;
+          default_reps?: number | null;
+          default_sets?: number | null;
+          default_weight?: number | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          name_ja?: string;
+          desc_ja?: string | null;
+          category_ja?: string;
+          default_reps?: number | null;
+          default_sets?: number | null;
+          default_weight?: number | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      shared_links: {
+        Row: {
+          id: string;
+          user_id: string;
+          video_id: string | null;
+          workout_id: string | null;
+          token: string;
+          expires_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          video_id?: string | null;
+          workout_id?: string | null;
+          token?: string;
+          expires_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          video_id?: string | null;
+          workout_id?: string | null;
+          token?: string;
+          expires_at?: string | null;
+          created_at?: string;
         };
         Relationships: [];
       };

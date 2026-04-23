@@ -6,12 +6,14 @@ import Link from "next/link";
 import {
   ArrowLeft, Play, Pause, SkipBack, SkipForward,
   Pencil, Layers, ChevronDown, ChevronUp, Loader2,
+  Trash2, ChevronLeft, ChevronRight,
 } from "lucide-react";
-import { MOCK_VIDEOS } from "@/lib/mocks/videos";
-import { getWorkoutSessionById } from "@/lib/mocks/workoutHistory";
 import { useAuth } from "@/lib/hooks/useAuth";
+import { useToast } from "@/lib/hooks/useToast";
+import { AppToast } from "@/components/common/AppToast";
 import { createClient } from "@/lib/supabase/client";
 import type { Video } from "@/types";
+import type { Json } from "@/types/database.types";
 import { VideoOverlay } from "@/components/player/VideoOverlay";
 import { DrawingCanvas, type DrawTool, type DrawShape } from "@/components/player/DrawingCanvas";
 import { OverlayControls } from "@/components/player/OverlayControls";
@@ -21,13 +23,27 @@ type GridType = "sixteen" | "center_v" | "center_h";
 type Panel = "overlay" | "draw" | null;
 
 const SPEED_OPTIONS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2];
+const FRAME_STEP = 1 / 30;
 
 type RecentWorkout = { id: string; title: string; workout_date: string };
+
+type AnnotationRow = {
+  id: string;
+  video_id: string;
+  user_id: string;
+  frame_time: number;
+  grid_settings: GridType[] | null;
+  drawing_shapes: DrawShape[] | null;
+  overlay_color: string | null;
+  overlay_thickness: number | null;
+  overlay_opacity: number | null;
+};
 
 export default function VideoDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
+  const { toast, show: showToast, dismiss: dismissToast } = useToast();
 
   const [video, setVideo] = useState<Video | null>(null);
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
@@ -54,27 +70,23 @@ export default function VideoDetailPage() {
 
   const [memo, setMemo] = useState("");
   const [memoOpen, setMemoOpen] = useState(false);
+  const [memoSaving, setMemoSaving] = useState(false);
 
   const [linkedWorkoutTitle, setLinkedWorkoutTitle] = useState<string | null>(null);
   const [recentWorkouts, setRecentWorkouts] = useState<RecentWorkout[]>([]);
   const [pendingWorkoutId, setPendingWorkoutId] = useState("");
   const [linkSaving, setLinkSaving] = useState(false);
 
+  const [deleting, setDeleting] = useState(false);
+  const [annotationId, setAnnotationId] = useState<string | null>(null);
+  const [annotationSaving, setAnnotationSaving] = useState(false);
+
   const [playbackError, setPlaybackError] = useState<string | null>(null);
 
+  // ── Data loading ──────────────────────────────────────────────
   useEffect(() => {
     if (authLoading) return;
-
     if (!user) {
-      setLinkedWorkoutTitle(null);
-      setRecentWorkouts([]);
-      setVideoSrc(null);
-      const mock = MOCK_VIDEOS.find((v) => v.id === id);
-      if (mock) {
-        setVideo(mock);
-        setDuration(mock.duration ?? 0);
-        setMemo(mock.memo ?? "");
-      }
       setDataLoading(false);
       return;
     }
@@ -119,7 +131,6 @@ export default function VideoDetailPage() {
         if (signed?.signedUrl) {
           setVideoSrc(signed.signedUrl);
         } else if (signErr) {
-          console.error("signed url error:", signErr.message);
           setPlaybackError("動画の読み込みURLを取得できませんでした。Storage の権限を確認してください。");
         }
       }
@@ -143,6 +154,26 @@ export default function VideoDetailPage() {
         .limit(20);
       if (list) setRecentWorkouts(list as RecentWorkout[]);
 
+      // Load saved annotation
+      const { data: ann } = await supabase
+        .from("video_annotations")
+        .select("*")
+        .eq("video_id", data.id)
+        .eq("user_id", user.id)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (ann) {
+        const row = ann as unknown as AnnotationRow;
+        setAnnotationId(row.id);
+        if (row.grid_settings) setActiveGrids(new Set(row.grid_settings));
+        if (row.drawing_shapes) setShapes(row.drawing_shapes);
+        if (row.overlay_color) setOverlayColor(row.overlay_color);
+        if (row.overlay_thickness != null) setOverlayThickness(row.overlay_thickness);
+        if (row.overlay_opacity != null) setOverlayOpacity(row.overlay_opacity);
+      }
+
       setDataLoading(false);
     })();
   }, [id, user, authLoading]);
@@ -162,6 +193,7 @@ export default function VideoDetailPage() {
     el.load();
   }, [videoSrc]);
 
+  // ── Link workout ──────────────────────────────────────────────
   const handleLinkWorkout = useCallback(async () => {
     if (!user || !video) return;
     setLinkSaving(true);
@@ -174,7 +206,7 @@ export default function VideoDetailPage() {
       .eq("user_id", user.id);
 
     if (error) {
-      console.error("video workout link error:", error.message);
+      showToast("ワークアウトの紐付けに失敗しました", "error");
       setLinkSaving(false);
       return;
     }
@@ -197,9 +229,122 @@ export default function VideoDetailPage() {
       }
     }
 
+    showToast("ワークアウトを紐付けました", "success");
     setLinkSaving(false);
-  }, [user, video, pendingWorkoutId, recentWorkouts]);
+  }, [user, video, pendingWorkoutId, recentWorkouts, showToast]);
 
+  // ── Memo save ─────────────────────────────────────────────────
+  const handleMemoSave = useCallback(async () => {
+    if (!user || !video) return;
+    setMemoSaving(true);
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("videos")
+      .update({ memo })
+      .eq("id", video.id)
+      .eq("user_id", user.id);
+
+    if (error) {
+      showToast("メモの保存に失敗しました", "error");
+    } else {
+      showToast("メモを保存しました", "success");
+      setMemoOpen(false);
+    }
+    setMemoSaving(false);
+  }, [user, video, memo, showToast]);
+
+  // ── Annotation save ───────────────────────────────────────────
+  const handleAnnotationSave = useCallback(async () => {
+    if (!user || !video) return;
+    setAnnotationSaving(true);
+    const supabase = createClient();
+
+    const payload = {
+      video_id: video.id,
+      user_id: user.id,
+      frame_time: currentTime,
+      grid_settings: Array.from(activeGrids) as unknown as Json,
+      drawing_shapes: shapes as unknown as Json,
+      overlay_color: overlayColor,
+      overlay_thickness: overlayThickness,
+      overlay_opacity: overlayOpacity,
+    };
+
+    let err;
+    if (annotationId) {
+      const res = await supabase
+        .from("video_annotations")
+        .update(payload)
+        .eq("id", annotationId);
+      err = res.error;
+    } else {
+      const res = await supabase
+        .from("video_annotations")
+        .insert(payload)
+        .select("id")
+        .single();
+      err = res.error;
+      if (res.data) setAnnotationId(res.data.id);
+    }
+
+    if (err) {
+      showToast("アノテーションの保存に失敗しました", "error");
+    } else {
+      showToast("アノテーションを保存しました", "success");
+    }
+    setAnnotationSaving(false);
+  }, [
+    user, video, currentTime, activeGrids, shapes,
+    overlayColor, overlayThickness, overlayOpacity,
+    annotationId, showToast,
+  ]);
+
+  // ── Video delete ──────────────────────────────────────────────
+  const handleDelete = useCallback(async () => {
+    if (!user || !video) return;
+    if (!window.confirm("この動画を削除しますか？この操作は取り消せません。")) return;
+
+    setDeleting(true);
+    const supabase = createClient();
+
+    if (video.file_path) {
+      const { error: storageErr } = await supabase.storage
+        .from("videos")
+        .remove([video.file_path]);
+      if (storageErr) {
+        showToast("ストレージからの削除に失敗しました", "error");
+        setDeleting(false);
+        return;
+      }
+    }
+
+    if (video.thumbnail_path) {
+      await supabase.storage.from("videos").remove([video.thumbnail_path]);
+    }
+
+    await supabase
+      .from("video_annotations")
+      .delete()
+      .eq("video_id", video.id)
+      .eq("user_id", user.id);
+
+    const { error: dbErr } = await supabase
+      .from("videos")
+      .delete()
+      .eq("id", video.id)
+      .eq("user_id", user.id);
+
+    if (dbErr) {
+      showToast("動画の削除に失敗しました", "error");
+      setDeleting(false);
+      return;
+    }
+
+    showToast("動画を削除しました", "success");
+    router.replace("/videos");
+  }, [user, video, showToast, router]);
+
+  // ── Playback ──────────────────────────────────────────────────
   const togglePlay = useCallback(async () => {
     const v = videoRef.current;
     if (!v || !videoSrc) return;
@@ -223,12 +368,23 @@ export default function VideoDetailPage() {
     v.currentTime = Math.max(0, Math.min(v.duration, v.currentTime + delta));
   }, []);
 
+  const stepFrame = useCallback((direction: 1 | -1) => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (!v.paused) {
+      v.pause();
+      setPlaying(false);
+    }
+    v.currentTime = Math.max(0, Math.min(v.duration, v.currentTime + direction * FRAME_STEP));
+  }, []);
+
   const selectSpeed = useCallback((s: number) => {
     setSpeed(s);
     setSpeedOpen(false);
     if (videoRef.current) videoRef.current.playbackRate = s;
   }, []);
 
+  // ── Video event listeners ─────────────────────────────────────
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
@@ -245,11 +401,22 @@ export default function VideoDetailPage() {
     };
   }, [seeking]);
 
+  // ── Speed menu: close on pointerdown + Escape ─────────────────
   useEffect(() => {
     if (!speedOpen) return;
     const close = () => setSpeedOpen(false);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        close();
+      }
+    };
     window.addEventListener("pointerdown", close);
-    return () => window.removeEventListener("pointerdown", close);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("pointerdown", close);
+      window.removeEventListener("keydown", onKey);
+    };
   }, [speedOpen]);
 
   const handleSeek = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -270,11 +437,6 @@ export default function VideoDetailPage() {
   const undoShape = useCallback(() => setShapes((prev) => prev.slice(0, -1)), []);
   const clearShapes = useCallback(() => setShapes([]), []);
 
-  const handleMemoSave = useCallback(() => {
-    console.log("save memo", { videoId: id, memo });
-    setMemoOpen(false);
-  }, [id, memo]);
-
   const fmtTime = (s: number) => {
     if (!s || isNaN(s)) return "0:00";
     const m = Math.floor(s / 60);
@@ -282,6 +444,7 @@ export default function VideoDetailPage() {
     return `${m}:${String(sec).padStart(2, "0")}`;
   };
 
+  // ── Loading state ─────────────────────────────────────────────
   if (dataLoading || authLoading) {
     return (
       <div className="flex min-h-dvh items-center justify-center">
@@ -290,6 +453,22 @@ export default function VideoDetailPage() {
     );
   }
 
+  // ── Not logged in ─────────────────────────────────────────────
+  if (!user) {
+    return (
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-4 px-6 text-center">
+        <p className="text-sm text-secondary">動画を閲覧するにはログインが必要です</p>
+        <Link
+          href="/login"
+          className="rounded-xl bg-inverse px-6 py-3 text-sm font-extrabold text-on-inverse transition-all active:scale-[0.98]"
+        >
+          ログインする
+        </Link>
+      </div>
+    );
+  }
+
+  // ── Video not found ───────────────────────────────────────────
   if (!video) {
     return (
       <div className="space-y-6">
@@ -301,11 +480,11 @@ export default function VideoDetailPage() {
     );
   }
 
-  const linkedSession = getWorkoutSessionById(video.workout_session_id);
-
   return (
     <div className="fixed inset-0 z-[60] flex flex-col">
-      {/* Header — 動画の外に独立配置 */}
+      <AppToast toast={toast} onDismiss={dismissToast} />
+
+      {/* Header */}
       <div className="shrink-0 bg-black px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top,0px))]">
         <div className="flex items-center gap-3">
           <button type="button" onClick={() => router.back()} className="shrink-0 text-white/80 active:text-white" aria-label="戻る">
@@ -318,13 +497,22 @@ export default function VideoDetailPage() {
                 href={`/videos?session=${video.workout_session_id}`}
                 className="mt-1 inline-block truncate text-[11px] font-semibold text-white/55 underline-offset-2 hover:text-white/90"
               >
-                ワークアウト: {linkedWorkoutTitle ?? linkedSession?.title ?? "セッション"}
+                ワークアウト: {linkedWorkoutTitle ?? "セッション"}
               </Link>
             )}
           </div>
           <span className="shrink-0 rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-label text-white/60">
             {video.exercise_type}
           </span>
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={deleting}
+            className="shrink-0 rounded-full bg-white/10 p-2 text-white/60 transition-colors active:bg-white/20 disabled:opacity-40"
+            aria-label="動画を削除"
+          >
+            {deleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} strokeWidth={1.5} />}
+          </button>
         </div>
       </div>
 
@@ -399,38 +587,37 @@ export default function VideoDetailPage() {
 
       {/* Controls area */}
       <div className="shrink-0 bg-white px-4 pb-[max(1.25rem,calc(0.75rem+env(safe-area-inset-bottom,0px)))] pt-3">
-        {user && (
-          <div className="mb-3 overflow-hidden rounded-[14px] border border-border bg-surface px-3 py-3 shadow-[0_0_0_1px_rgba(0,0,0,.03)]">
-            <p className="text-[10px] font-title uppercase tracking-[0.12em] text-muted">ワークアウト</p>
-            <p className="mt-1 text-[12px] leading-relaxed text-secondary">
-              履歴のセッションにこの動画を紐付けます
-            </p>
-            <select
-              value={pendingWorkoutId}
-              onChange={(e) => setPendingWorkoutId(e.target.value)}
-              aria-label="紐付けるワークアウト"
-              className="mt-2 min-h-[44px] w-full rounded-lg border border-border bg-white px-3 text-sm font-semibold text-primary focus:outline-none focus:ring-2 focus:ring-primary/10"
-            >
-              <option value="">紐付けなし</option>
-              {recentWorkouts.map((w) => (
-                <option key={w.id} value={w.id}>
-                  {w.title}（{w.workout_date}）
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              onClick={handleLinkWorkout}
-              disabled={
-                linkSaving || pendingWorkoutId === (video.workout_session_id ?? "")
-              }
-              className="mt-2 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-inverse text-sm font-extrabold tracking-wide text-on-inverse transition-all duration-150 active:scale-[0.98] disabled:opacity-40"
-            >
-              {linkSaving && <Loader2 size={16} className="animate-spin" />}
-              ワークアウトに登録
-            </button>
-          </div>
-        )}
+        {/* Workout link section */}
+        <div className="mb-3 overflow-hidden rounded-[14px] border border-border bg-surface px-3 py-3 shadow-[0_0_0_1px_rgba(0,0,0,.03)]">
+          <p className="text-[10px] font-title uppercase tracking-[0.12em] text-muted">ワークアウト</p>
+          <p className="mt-1 text-[12px] leading-relaxed text-secondary">
+            履歴のセッションにこの動画を紐付けます
+          </p>
+          <select
+            value={pendingWorkoutId}
+            onChange={(e) => setPendingWorkoutId(e.target.value)}
+            aria-label="紐付けるワークアウト"
+            className="mt-2 min-h-[44px] w-full rounded-lg border border-border bg-white px-3 text-sm font-semibold text-primary focus:outline-none focus:ring-2 focus:ring-primary/10"
+          >
+            <option value="">紐付けなし</option>
+            {recentWorkouts.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.title}（{w.workout_date}）
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={handleLinkWorkout}
+            disabled={
+              linkSaving || pendingWorkoutId === (video.workout_session_id ?? "")
+            }
+            className="mt-2 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-inverse text-sm font-extrabold tracking-wide text-on-inverse transition-all duration-150 active:scale-[0.98] disabled:opacity-40"
+          >
+            {linkSaving && <Loader2 size={16} className="animate-spin" />}
+            ワークアウトに登録
+          </button>
+        </div>
 
         {/* Seek bar */}
         <div className="mb-2 flex items-center gap-2">
@@ -450,8 +637,11 @@ export default function VideoDetailPage() {
           <span className="w-9 text-[10px] font-metric text-muted">{fmtTime(duration)}</span>
         </div>
 
-        {/* Playback */}
-        <div className="flex items-center justify-center gap-4">
+        {/* Playback controls */}
+        <div className="flex items-center justify-center gap-2">
+          <button type="button" onClick={() => stepFrame(-1)} className="flex min-h-[44px] min-w-[44px] items-center justify-center text-muted transition-colors active:text-primary" aria-label="1フレーム戻す">
+            <ChevronLeft size={16} strokeWidth={2} />
+          </button>
           <button type="button" onClick={() => skip(-5)} className="flex min-h-[44px] min-w-[44px] items-center justify-center text-secondary transition-colors active:text-primary" aria-label="5秒戻す">
             <SkipBack size={18} strokeWidth={1.5} />
           </button>
@@ -466,9 +656,12 @@ export default function VideoDetailPage() {
           <button type="button" onClick={() => skip(5)} className="flex min-h-[44px] min-w-[44px] items-center justify-center text-secondary transition-colors active:text-primary" aria-label="5秒進める">
             <SkipForward size={18} strokeWidth={1.5} />
           </button>
+          <button type="button" onClick={() => stepFrame(1)} className="flex min-h-[44px] min-w-[44px] items-center justify-center text-muted transition-colors active:text-primary" aria-label="1フレーム進める">
+            <ChevronRight size={16} strokeWidth={2} />
+          </button>
 
           {/* Speed selector */}
-          <div className="relative ml-2">
+          <div className="relative ml-1">
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); setSpeedOpen((p) => !p); }}
@@ -550,6 +743,15 @@ export default function VideoDetailPage() {
               opacity={overlayOpacity}
               onOpacityChange={setOverlayOpacity}
             />
+            <button
+              type="button"
+              onClick={handleAnnotationSave}
+              disabled={annotationSaving}
+              className="mt-2 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-inverse text-sm font-extrabold tracking-wide text-on-inverse transition-all duration-150 active:scale-[0.98] disabled:opacity-40"
+            >
+              {annotationSaving && <Loader2 size={16} className="animate-spin" />}
+              オーバーレイを保存
+            </button>
           </div>
         )}
 
@@ -564,6 +766,15 @@ export default function VideoDetailPage() {
               onUndo={undoShape}
               onClearAll={clearShapes}
             />
+            <button
+              type="button"
+              onClick={handleAnnotationSave}
+              disabled={annotationSaving}
+              className="mt-2 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-inverse text-sm font-extrabold tracking-wide text-on-inverse transition-all duration-150 active:scale-[0.98] disabled:opacity-40"
+            >
+              {annotationSaving && <Loader2 size={16} className="animate-spin" />}
+              描画を保存
+            </button>
           </div>
         )}
 
@@ -579,8 +790,10 @@ export default function VideoDetailPage() {
             <button
               type="button"
               onClick={handleMemoSave}
-              className="min-h-[44px] w-full rounded-xl bg-inverse text-sm font-extrabold tracking-wide text-on-inverse transition-colors duration-150 active:scale-[0.98]"
+              disabled={memoSaving}
+              className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-inverse text-sm font-extrabold tracking-wide text-on-inverse transition-colors duration-150 active:scale-[0.98] disabled:opacity-40"
             >
+              {memoSaving && <Loader2 size={16} className="animate-spin" />}
               保存
             </button>
           </div>

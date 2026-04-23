@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/hooks/useAuth";
 import { createClient } from "@/lib/supabase/client";
 
 type BodyLogFormProps = {
+  editLog?: import("@/types").BodyLog | null;
   onClose: () => void;
   onSaved?: () => void;
 };
@@ -17,41 +18,41 @@ function getTodayString() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export function BodyLogForm({ onClose, onSaved }: BodyLogFormProps) {
+export function BodyLogForm({ editLog, onClose, onSaved }: BodyLogFormProps) {
   const { user } = useAuth();
-  const [date, setDate] = useState(getTodayString);
-  const [weight, setWeight] = useState("");
-  const [fat, setFat] = useState("");
+  const isEdit = !!editLog;
+  const [date, setDate] = useState(editLog?.log_date ?? getTodayString);
+  const [weight, setWeight] = useState(editLog ? String(editLog.weight) : "");
+  const [fat, setFat] = useState(editLog?.body_fat != null ? String(editLog.body_fat) : "");
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
-    if (!weight) return;
-
-    if (!user) {
-      console.log("body log (guest)", {
-        log_date: date,
-        weight: parseFloat(weight),
-        body_fat: fat ? parseFloat(fat) : null,
-      });
-      onSaved?.();
-      onClose();
-      return;
-    }
+    if (!weight || !user) return;
 
     setSaving(true);
     const supabase = createClient();
-    const { error } = await supabase.from("body_logs").insert({
-      user_id: user.id,
-      log_date: date,
-      weight: parseFloat(weight),
-      body_fat_pct: fat ? parseFloat(fat) : null,
-    });
 
-    setSaving(false);
-
-    if (error) {
-      console.error("body_logs insert error:", error.message);
-      return;
+    if (isEdit && editLog) {
+      const { error } = await supabase
+        .from("body_logs")
+        .update({
+          log_date: date,
+          weight: parseFloat(weight),
+          body_fat_pct: fat ? parseFloat(fat) : null,
+        })
+        .eq("id", editLog.id)
+        .eq("user_id", user.id);
+      setSaving(false);
+      if (error) return;
+    } else {
+      const { error } = await supabase.from("body_logs").insert({
+        user_id: user.id,
+        log_date: date,
+        weight: parseFloat(weight),
+        body_fat_pct: fat ? parseFloat(fat) : null,
+      });
+      setSaving(false);
+      if (error) return;
     }
 
     setWeight("");
@@ -66,7 +67,7 @@ export function BodyLogForm({ onClose, onSaved }: BodyLogFormProps) {
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-title uppercase tracking-[0.12em] text-muted">Body</p>
-          <h2 className="mt-1 text-lg font-bold tracking-tight">記録を追加</h2>
+          <h2 className="mt-1 text-lg font-bold tracking-tight">{isEdit ? "記録を編集" : "記録を追加"}</h2>
         </div>
         <button
           type="button"
@@ -133,7 +134,7 @@ export function BodyLogForm({ onClose, onSaved }: BodyLogFormProps) {
           className="flex-[2]"
         >
           {saving && <Loader2 size={14} className="animate-spin" />}
-          記録する
+          {isEdit ? "更新する" : "記録する"}
         </PrimaryRecordButton>
       </div>
     </div>

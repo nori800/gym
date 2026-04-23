@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { Pencil, Trash2 } from "lucide-react";
 import type { BodyLog } from "@/types";
 import { RecordDateBlock } from "@/components/common/RecordDateBlock";
 
@@ -44,7 +45,13 @@ function formatXLabel(d: string, range: Range) {
   return `${date.getMonth() + 1}/${date.getDate()}`;
 }
 
-export function BodyDetail({ logs }: { logs: BodyLog[] }) {
+type BodyDetailProps = {
+  logs: BodyLog[];
+  onEdit?: (log: BodyLog) => void;
+  onDelete?: (log: BodyLog) => void;
+};
+
+export function BodyDetail({ logs, onEdit, onDelete }: BodyDetailProps) {
   const [range, setRange] = useState<Range>("month");
   const data = useMemo(() => filterByRange(logs, range), [logs, range]);
 
@@ -282,7 +289,33 @@ export function BodyDetail({ logs }: { logs: BodyLog[] }) {
               key={d.id}
               className="overflow-hidden rounded-[18px] bg-white p-[18px] shadow-[0_0_0_1px_rgba(0,0,0,.04)]"
             >
-              <RecordDateBlock iso={d.log_date} />
+              <div className="flex items-start justify-between">
+                <RecordDateBlock iso={d.log_date} />
+                {(onEdit || onDelete) && (
+                  <div className="flex items-center gap-1">
+                    {onEdit && (
+                      <button
+                        type="button"
+                        onClick={() => onEdit(d)}
+                        className="flex h-8 w-8 items-center justify-center rounded-full text-secondary transition-all active:bg-chip active:scale-95"
+                        aria-label={`${d.log_date} の記録を編集`}
+                      >
+                        <Pencil size={14} strokeWidth={1.5} />
+                      </button>
+                    )}
+                    {onDelete && (
+                      <button
+                        type="button"
+                        onClick={() => onDelete(d)}
+                        className="flex h-8 w-8 items-center justify-center rounded-full text-danger/70 transition-all active:bg-danger/10 active:scale-95"
+                        aria-label={`${d.log_date} の記録を削除`}
+                      >
+                        <Trash2 size={14} strokeWidth={1.5} />
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
               <div className="mt-3 flex items-baseline justify-between border-t border-border pt-3">
                 <span className="text-xl font-metric leading-none">
                   {d.weight}

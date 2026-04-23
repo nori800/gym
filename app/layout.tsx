@@ -20,6 +20,15 @@ const notoSansJP = Noto_Sans_JP({
 export const metadata: Metadata = {
   title: "FormCheck",
   description: "フォーム確認に強い筋トレ記録PWA",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "FormCheck",
+  },
+  icons: {
+    apple: "/images/icon-192.png",
+  },
 };
 
 export const viewport: Viewport = {
@@ -34,6 +43,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="ja" className={`${inter.variable} ${notoSansJP.variable}`}>
       <body className={`${inter.className} flex min-h-dvh flex-col font-sans`}>
         <OnboardingGate>{children}</OnboardingGate>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `if("serviceWorker"in navigator){window.addEventListener("load",()=>{navigator.serviceWorker.register("/sw.js")})}`,
+          }}
+        />
       </body>
     </html>
   );
