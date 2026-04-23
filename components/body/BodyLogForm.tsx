@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { X } from "lucide-react";
+import { X, Loader2 } from "lucide-react";
 import { PrimaryRecordButton } from "@/components/common/PrimaryRecordButton";
 import { DatePickerField } from "@/components/common/DatePickerField";
+import { useAuth } from "@/lib/hooks/useAuth";
+import { createClient } from "@/lib/supabase/client";
 
 type BodyLogFormProps = {
   onClose: () => void;
@@ -16,17 +18,42 @@ function getTodayString() {
 }
 
 export function BodyLogForm({ onClose, onSaved }: BodyLogFormProps) {
+  const { user } = useAuth();
   const [date, setDate] = useState(getTodayString);
   const [weight, setWeight] = useState("");
   const [fat, setFat] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!weight) return;
-    console.log("body log", {
+
+    if (!user) {
+      console.log("body log (guest)", {
+        log_date: date,
+        weight: parseFloat(weight),
+        body_fat: fat ? parseFloat(fat) : null,
+      });
+      onSaved?.();
+      onClose();
+      return;
+    }
+
+    setSaving(true);
+    const supabase = createClient();
+    const { error } = await supabase.from("body_logs").insert({
+      user_id: user.id,
       log_date: date,
       weight: parseFloat(weight),
-      body_fat: fat ? parseFloat(fat) : null,
+      body_fat_pct: fat ? parseFloat(fat) : null,
     });
+
+    setSaving(false);
+
+    if (error) {
+      console.error("body_logs insert error:", error.message);
+      return;
+    }
+
     setWeight("");
     setFat("");
     onSaved?.();
@@ -38,9 +65,7 @@ export function BodyLogForm({ onClose, onSaved }: BodyLogFormProps) {
       <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-border" aria-hidden />
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-xs font-title uppercase tracking-[0.12em] text-muted">
-            Body
-          </p>
+          <p className="text-xs font-title uppercase tracking-[0.12em] text-muted">Body</p>
           <h2 className="mt-1 text-lg font-bold tracking-tight">記録を追加</h2>
         </div>
         <button
@@ -104,9 +129,10 @@ export function BodyLogForm({ onClose, onSaved }: BodyLogFormProps) {
         <PrimaryRecordButton
           type="button"
           onClick={handleSave}
-          disabled={!weight}
+          disabled={!weight || saving}
           className="flex-[2]"
         >
+          {saving && <Loader2 size={14} className="animate-spin" />}
           記録する
         </PrimaryRecordButton>
       </div>

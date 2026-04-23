@@ -1,15 +1,42 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Settings, TrendingUp, Camera, ChevronRight, Dumbbell, Sparkles } from "lucide-react";
+import { Settings, TrendingUp, Camera, ChevronRight, Dumbbell, Sparkles, Loader2 } from "lucide-react";
 import { MOCK_VIDEOS } from "@/lib/mocks/videos";
 import { MOCK_WORKOUT_HISTORY } from "@/lib/mocks/workoutHistory";
 import { MOCK_BODY_LOGS } from "@/lib/mocks/bodyLogs";
 import { formatJapaneseLongDate } from "@/lib/utils/formatRecordDate";
+import { useAuth } from "@/lib/hooks/useAuth";
+import { createClient } from "@/lib/supabase/client";
 
-function getSuggestedWorkout() {
-  if (MOCK_WORKOUT_HISTORY.length === 0) return null;
-  const categories = MOCK_WORKOUT_HISTORY.map((w) => w.categories).flat();
+type DashboardData = {
+  weekSessions: number;
+  latestWeight: { weight: number; date: string } | null;
+  videoCount: number;
+  recentWorkouts: { id: string; title: string; date: string; durationMin: number; totalSets: number }[];
+};
+
+function buildMockDashboard(): DashboardData {
+  const latestWeight = MOCK_BODY_LOGS.length > 0
+    ? { weight: MOCK_BODY_LOGS[MOCK_BODY_LOGS.length - 1].weight, date: MOCK_BODY_LOGS[MOCK_BODY_LOGS.length - 1].log_date }
+    : null;
+  return {
+    weekSessions: MOCK_WORKOUT_HISTORY.length,
+    latestWeight,
+    videoCount: MOCK_VIDEOS.length,
+    recentWorkouts: MOCK_WORKOUT_HISTORY.slice(0, 3).map((w) => ({
+      id: w.id,
+      title: w.title,
+      date: w.date,
+      durationMin: w.durationMin,
+      totalSets: w.totalSets,
+    })),
+  };
+}
+
+function getSuggestedWorkout(categories: string[]) {
+  if (categories.length === 0) return null;
   const freq: Record<string, number> = {};
   for (const c of categories) freq[c] = (freq[c] || 0) + 1;
   const sorted = Object.entries(freq).sort((a, b) => a[1] - b[1]);
@@ -29,15 +56,81 @@ function getSuggestedWorkout() {
 }
 
 export default function DashboardPage() {
-  const weekSessions = MOCK_WORKOUT_HISTORY.length;
-  const videoCount = MOCK_VIDEOS.length;
-  const latestWeight = MOCK_BODY_LOGS[MOCK_BODY_LOGS.length - 1];
-  const recentWorkouts = MOCK_WORKOUT_HISTORY.slice(0, 3);
-  const suggestion = getSuggestedWorkout();
+  const { user, loading: authLoading } = useAuth();
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [allCategories, setAllCategories] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (authLoading) return;
+
+    if (!user) {
+      const mock = buildMockDashboard();
+      setData(mock);
+      setAllCategories(MOCK_WORKOUT_HISTORY.flatMap((w) => w.categories));
+      return;
+    }
+
+    const supabase = createClient();
+
+    Promise.all([
+      supabase
+        .from("workouts")
+        .select("id, title, workout_date, duration_min, total_sets, categories")
+        .eq("user_id", user.id)
+        .order("workout_date", { ascending: false })
+        .limit(10),
+      supabase
+        .from("body_logs")
+        .select("weight, log_date")
+        .eq("user_id", user.id)
+        .order("log_date", { ascending: false })
+        .limit(1),
+      supabase
+        .from("videos")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id),
+    ]).then(([workoutsRes, bodyRes, videosRes]) => {
+      const workouts = workoutsRes.data ?? [];
+      const bodyLog = bodyRes.data?.[0];
+      const videoCount = videosRes.count ?? 0;
+
+      if (workouts.length === 0 && !bodyLog && videoCount === 0) {
+        const mock = buildMockDashboard();
+        setData(mock);
+        setAllCategories(MOCK_WORKOUT_HISTORY.flatMap((w) => w.categories));
+        return;
+      }
+
+      const recentWorkouts = workouts.slice(0, 3).map((w) => ({
+        id: w.id,
+        title: w.title,
+        date: w.workout_date,
+        durationMin: w.duration_min ?? 0,
+        totalSets: w.total_sets ?? 0,
+      }));
+
+      setData({
+        weekSessions: workouts.length,
+        latestWeight: bodyLog ? { weight: bodyLog.weight ?? 0, date: bodyLog.log_date } : null,
+        videoCount,
+        recentWorkouts,
+      });
+      setAllCategories(workouts.flatMap((w) => w.categories ?? []));
+    });
+  }, [user, authLoading]);
+
+  if (!data) {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <Loader2 size={24} className="animate-spin text-muted" />
+      </div>
+    );
+  }
+
+  const suggestion = getSuggestedWorkout(allCategories);
 
   return (
     <div className="space-y-8">
-      {/* Header */}
       <header className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-title tracking-tight">FormCheck</h1>
@@ -51,39 +144,31 @@ export default function DashboardPage() {
         </Link>
       </header>
 
-      {/* Stats */}
       <section className="grid grid-cols-2 gap-2.5">
         <div className="flex flex-col justify-center rounded-[18px] bg-white p-4 shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
           <p className="text-xs font-title uppercase tracking-[0.12em] text-muted">今週</p>
           <p className="mt-2 flex items-baseline gap-1">
-            <span className="text-3xl font-metric leading-none">{weekSessions}</span>
+            <span className="text-3xl font-metric leading-none">{data.weekSessions}</span>
             <span className="text-sm font-caption text-muted">セッション</span>
           </p>
         </div>
         <div className="flex flex-col justify-center rounded-[18px] bg-white p-4 shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
           <p className="text-xs font-title uppercase tracking-[0.12em] text-muted">体重</p>
           <p className="mt-2 flex items-baseline gap-1">
-            <span className="text-3xl font-metric leading-none">
-              {latestWeight?.weight ?? "—"}
-            </span>
+            <span className="text-3xl font-metric leading-none">{data.latestWeight?.weight ?? "—"}</span>
             <span className="text-sm font-caption text-muted">kg</span>
           </p>
-          {latestWeight && (
-            <p className="mt-1 text-[11px] text-secondary">
-              {formatJapaneseLongDate(latestWeight.log_date)}
-            </p>
+          {data.latestWeight && (
+            <p className="mt-1 text-[11px] text-secondary">{formatJapaneseLongDate(data.latestWeight.date)}</p>
           )}
         </div>
       </section>
 
-      {/* Today's workout suggestion */}
       {suggestion && (
         <section>
           <div className="flex items-center gap-1.5 px-0.5">
             <Sparkles size={12} strokeWidth={2} className="text-accent" />
-            <h2 className="text-xs font-title uppercase tracking-[0.12em] text-muted">
-              今日のおすすめ
-            </h2>
+            <h2 className="text-xs font-title uppercase tracking-[0.12em] text-muted">今日のおすすめ</h2>
           </div>
           <Link
             href="/workouts/edit"
@@ -101,29 +186,21 @@ export default function DashboardPage() {
         </section>
       )}
 
-      {/* Recent workouts OR getting started guide */}
-      {recentWorkouts.length > 0 ? (
+      {data.recentWorkouts.length > 0 ? (
         <section className="space-y-3">
           <div className="flex items-center justify-between px-0.5">
-            <h2 className="text-xs font-title uppercase tracking-[0.12em] text-muted">
-              最近のワークアウト
-            </h2>
-            <Link
-              href="/workouts"
-              className="flex items-center gap-0.5 text-[12px] font-title text-secondary transition-colors active:text-primary"
-            >
+            <h2 className="text-xs font-title uppercase tracking-[0.12em] text-muted">最近のワークアウト</h2>
+            <Link href="/workouts" className="flex items-center gap-0.5 text-[12px] font-title text-secondary transition-colors active:text-primary">
               すべて見る
               <ChevronRight size={14} strokeWidth={1.5} />
             </Link>
           </div>
           <div className="overflow-hidden rounded-[18px] bg-white shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
-            {recentWorkouts.map((workout, i) => (
+            {data.recentWorkouts.map((workout, i) => (
               <Link
                 key={workout.id}
                 href="/workouts"
-                className={`flex items-center gap-3.5 px-[18px] py-3.5 transition-colors duration-150 active:bg-surface ${
-                  i > 0 ? "border-t border-border" : ""
-                }`}
+                className={`flex items-center gap-3.5 px-[18px] py-3.5 transition-colors duration-150 active:bg-surface ${i > 0 ? "border-t border-border" : ""}`}
               >
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-surface">
                   <TrendingUp size={18} strokeWidth={1.5} className="text-primary" />
@@ -141,9 +218,7 @@ export default function DashboardPage() {
         </section>
       ) : (
         <section className="space-y-3">
-          <h2 className="px-0.5 text-xs font-title uppercase tracking-[0.12em] text-muted">
-            はじめよう
-          </h2>
+          <h2 className="px-0.5 text-xs font-title uppercase tracking-[0.12em] text-muted">はじめよう</h2>
           <div className="rounded-[18px] bg-white p-[18px] shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
             <p className="text-sm font-bold tracking-tight">ワークアウトを始めよう</p>
             <p className="mt-1.5 text-[13px] leading-relaxed text-secondary">
@@ -160,11 +235,8 @@ export default function DashboardPage() {
         </section>
       )}
 
-      {/* Quick access — FormCheck feature */}
       <section className="space-y-3">
-        <h2 className="px-0.5 text-xs font-title uppercase tracking-[0.12em] text-muted">
-          フォームチェック
-        </h2>
+        <h2 className="px-0.5 text-xs font-title uppercase tracking-[0.12em] text-muted">フォームチェック</h2>
         <Link
           href="/capture"
           className="flex items-center gap-3.5 rounded-[18px] bg-white px-[18px] py-4 shadow-[0_0_0_1px_rgba(0,0,0,.04)] transition-all duration-150 active:scale-[0.99]"
@@ -174,13 +246,10 @@ export default function DashboardPage() {
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-bold tracking-tight">撮影して記録</p>
-            <p className="mt-0.5 text-[11px] text-secondary">
-              フォームを撮影してチェック
-            </p>
+            <p className="mt-0.5 text-[11px] text-secondary">フォームを撮影してチェック</p>
           </div>
           <ChevronRight size={16} strokeWidth={1.5} className="shrink-0 text-muted" />
         </Link>
-
         <Link
           href="/videos"
           className="flex items-center gap-3.5 rounded-[18px] bg-white px-[18px] py-4 shadow-[0_0_0_1px_rgba(0,0,0,.04)] transition-all duration-150 active:scale-[0.99]"
@@ -191,7 +260,7 @@ export default function DashboardPage() {
           <div className="min-w-0 flex-1">
             <p className="text-sm font-bold tracking-tight">動画ライブラリ</p>
             <p className="mt-0.5 text-[11px] text-secondary">
-              {videoCount > 0 ? `${videoCount}本の撮影動画` : "撮影した動画をここで確認"}
+              {data.videoCount > 0 ? `${data.videoCount}本の撮影動画` : "撮影した動画をここで確認"}
             </p>
           </div>
           <ChevronRight size={16} strokeWidth={1.5} className="shrink-0 text-muted" />

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { MOCK_BODY_LOGS } from "@/lib/mocks/bodyLogs";
 import type { BodyLog } from "@/types";
 import { RecordDateBlock } from "@/components/common/RecordDateBlock";
 
@@ -13,10 +12,14 @@ const RANGE_OPTIONS: { key: Range; label: string }[] = [
   { key: "year", label: "1年" },
 ];
 
-const TODAY = "2026-04-21";
+function getTodayIso() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
 function filterByRange(data: BodyLog[], range: Range): BodyLog[] {
-  const cutoff = new Date(`${TODAY}T12:00:00`);
+  const today = getTodayIso();
+  const cutoff = new Date(`${today}T12:00:00`);
   if (range === "week") cutoff.setDate(cutoff.getDate() - 7);
   else if (range === "month") cutoff.setMonth(cutoff.getMonth() - 1);
   else cutoff.setFullYear(cutoff.getFullYear() - 1);
@@ -41,9 +44,9 @@ function formatXLabel(d: string, range: Range) {
   return `${date.getMonth() + 1}/${date.getDate()}`;
 }
 
-export function BodyDetail() {
+export function BodyDetail({ logs }: { logs: BodyLog[] }) {
   const [range, setRange] = useState<Range>("month");
-  const data = useMemo(() => filterByRange(MOCK_BODY_LOGS, range), [range]);
+  const data = useMemo(() => filterByRange(logs, range), [logs, range]);
 
   if (data.length === 0) {
     return (

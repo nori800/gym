@@ -53,6 +53,7 @@
 | [development/07-coding-standards.md](development/07-coding-standards.md) | コーディング規約 |
 | [development/08-validation-and-errors.md](development/08-validation-and-errors.md) | バリデーション・エラーハンドリング一覧 |
 | [development/09-implementation-plan.md](development/09-implementation-plan.md) | MVP実装計画（チェックリスト・三人レビュー） |
+| [development/10-supabase-integration-implementation-plan.md](development/10-supabase-integration-implementation-plan.md) | Supabase 連携実装計画（接続後のフェーズ・スキーマギャップ） |
 
 ---
 

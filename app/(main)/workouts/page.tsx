@@ -1,25 +1,96 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
-import { PenSquare, Dumbbell, Video, X, Camera } from "lucide-react";
+import { PenSquare, Dumbbell, Video, X, Camera, Loader2 } from "lucide-react";
 import { MOCK_WORKOUT_HISTORY, type WorkoutHistoryEntry } from "@/lib/mocks/workoutHistory";
 import { MOCK_VIDEOS } from "@/lib/mocks/videos";
 import { RecordDateBlock } from "@/components/common/RecordDateBlock";
 import { FocusTrap } from "@/components/common/FocusTrap";
+import { useAuth } from "@/lib/hooks/useAuth";
+import { createClient } from "@/lib/supabase/client";
+import type { Json } from "@/types/database.types";
+
+function rowToEntry(row: {
+  id: string;
+  title: string;
+  workout_date: string;
+  total_sets: number | null;
+  total_volume: number | null;
+  duration_min: number | null;
+  categories: string[];
+  blocks_json: Json;
+}): WorkoutHistoryEntry {
+  const blocks = (Array.isArray(row.blocks_json) ? row.blocks_json : []) as Array<{
+    movements?: Array<{ nameJa?: string; sets?: number; reps?: number; weight?: number }>;
+  }>;
+  const movements = blocks.flatMap((b) =>
+    (b.movements ?? []).map((m) => ({
+      name: m.nameJa ?? "",
+      sets: m.sets ?? 0,
+      reps: m.reps ?? 0,
+      weight: m.weight ?? 0,
+    })),
+  );
+  const totalReps = movements.reduce((s, m) => s + m.reps * m.sets, 0);
+
+  return {
+    id: row.id,
+    title: row.title,
+    date: row.workout_date,
+    totalSets: row.total_sets ?? 0,
+    totalReps,
+    totalVolume: row.total_volume ?? 0,
+    durationMin: row.duration_min ?? 0,
+    categories: row.categories ?? [],
+    movements,
+  };
+}
 
 export default function WorkoutsPage() {
-  const history = MOCK_WORKOUT_HISTORY;
-  const isEmpty = history.length === 0;
+  const { user, loading: authLoading } = useAuth();
+  const [history, setHistory] = useState<WorkoutHistoryEntry[]>([]);
+  const [loading, setLoading] = useState(true);
   const [detailEntry, setDetailEntry] = useState<WorkoutHistoryEntry | null>(null);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      setHistory(MOCK_WORKOUT_HISTORY);
+      setLoading(false);
+      return;
+    }
+    const supabase = createClient();
+    supabase
+      .from("workouts")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("workout_date", { ascending: false })
+      .then(({ data }) => {
+        if (data && data.length > 0) {
+          setHistory(data.map(rowToEntry));
+        } else {
+          setHistory(MOCK_WORKOUT_HISTORY);
+        }
+        setLoading(false);
+      });
+  }, [user, authLoading]);
+
+  if (loading || authLoading) {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <Loader2 size={24} className="animate-spin text-muted" />
+      </div>
+    );
+  }
+
+  const isEmpty = history.length === 0;
 
   return (
     <div className="relative min-h-[calc(100dvh-6rem)]">
       <header className="flex items-end justify-between">
         <div>
-          <p className="text-xs font-title uppercase tracking-[0.12em] text-muted">
-            Workouts
-          </p>
+          <p className="text-xs font-title uppercase tracking-[0.12em] text-muted">Workouts</p>
           <h1 className="mt-1 text-xl font-title tracking-tight">ワークアウト履歴</h1>
         </div>
         <p className="pb-1 text-xs font-caption text-muted">全 {history.length} 件</p>
@@ -30,17 +101,11 @@ export default function WorkoutsPage() {
       ) : (
         <div className="mt-6 space-y-3">
           {history.map((entry, i) => (
-            <HistoryCard
-              key={entry.id}
-              entry={entry}
-              isLatest={i === 0}
-              onTap={() => setDetailEntry(entry)}
-            />
+            <HistoryCard key={entry.id} entry={entry} isLatest={i === 0} onTap={() => setDetailEntry(entry)} />
           ))}
         </div>
       )}
 
-      {/* FAB */}
       <Link
         href="/workouts/edit"
         aria-label="新しいワークアウトを作成"
@@ -50,13 +115,7 @@ export default function WorkoutsPage() {
         新規作成
       </Link>
 
-      {/* Detail bottom sheet */}
-      {detailEntry && (
-        <WorkoutDetailSheet
-          entry={detailEntry}
-          onClose={() => setDetailEntry(null)}
-        />
-      )}
+      {detailEntry && <WorkoutDetailSheet entry={detailEntry} onClose={() => setDetailEntry(null)} />}
     </div>
   );
 }
@@ -82,15 +141,7 @@ function EmptyState() {
   );
 }
 
-function HistoryCard({
-  entry,
-  isLatest,
-  onTap,
-}: {
-  entry: WorkoutHistoryEntry;
-  isLatest: boolean;
-  onTap: () => void;
-}) {
+function HistoryCard({ entry, isLatest, onTap }: { entry: WorkoutHistoryEntry; isLatest: boolean; onTap: () => void }) {
   const videoCount = MOCK_VIDEOS.filter((v) => v.workout_session_id === entry.id).length;
 
   return (
@@ -99,17 +150,13 @@ function HistoryCard({
       tabIndex={0}
       onClick={onTap}
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onTap(); }}
-      className={`cursor-pointer overflow-hidden rounded-[18px] bg-white shadow-[0_0_0_1px_rgba(0,0,0,.04)] transition-all duration-150 active:scale-[0.99] ${
-        isLatest ? "ring-1 ring-primary/10" : ""
-      }`}
+      className={`cursor-pointer overflow-hidden rounded-[18px] bg-white shadow-[0_0_0_1px_rgba(0,0,0,.04)] transition-all duration-150 active:scale-[0.99] ${isLatest ? "ring-1 ring-primary/10" : ""}`}
     >
       <div className="p-[18px]">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <RecordDateBlock iso={entry.date} />
-            <h3 className="mt-3 truncate text-lg font-bold tracking-tight">
-              {entry.title}
-            </h3>
+            <h3 className="mt-3 truncate text-lg font-bold tracking-tight">{entry.title}</h3>
             {videoCount > 0 && (
               <Link
                 href={`/videos?session=${entry.id}`}
@@ -123,33 +170,20 @@ function HistoryCard({
           </div>
           <div className="flex shrink-0 flex-wrap justify-end gap-1">
             {entry.categories.map((c) => (
-              <span
-                key={c}
-                className="rounded-full bg-chip px-2.5 py-1 text-[10px] font-extrabold text-secondary"
-              >
-                {c}
-              </span>
+              <span key={c} className="rounded-full bg-chip px-2.5 py-1 text-[10px] font-extrabold text-secondary">{c}</span>
             ))}
           </div>
         </div>
-
         <div className="mt-4 grid grid-cols-3 gap-1 border-t border-border pt-4">
           <Metric value={entry.durationMin} unit="分" label="時間" />
           <Metric value={entry.totalSets} unit="セット" label="合計" />
-          <Metric
-            value={entry.totalVolume.toLocaleString()}
-            unit="kg"
-            label="総重量"
-          />
+          <Metric value={entry.totalVolume.toLocaleString()} unit="kg" label="総重量" />
         </div>
-
         <div className="mt-3.5 space-y-1.5">
           {entry.movements.slice(0, 3).map((m, i) => (
             <div key={i} className="flex items-center justify-between text-sm">
               <span className="truncate text-primary">{m.name}</span>
-              <span className="shrink-0 pl-3 font-metric text-secondary">
-                {m.weight}kg × {m.reps} × {m.sets}
-              </span>
+              <span className="shrink-0 pl-3 font-metric text-secondary">{m.weight}kg × {m.reps} × {m.sets}</span>
             </div>
           ))}
         </div>
@@ -158,101 +192,52 @@ function HistoryCard({
   );
 }
 
-function WorkoutDetailSheet({
-  entry,
-  onClose,
-}: {
-  entry: WorkoutHistoryEntry;
-  onClose: () => void;
-}) {
+function WorkoutDetailSheet({ entry, onClose }: { entry: WorkoutHistoryEntry; onClose: () => void }) {
   const videoCount = MOCK_VIDEOS.filter((v) => v.workout_session_id === entry.id).length;
   const handleBackdropClick = useCallback(() => onClose(), [onClose]);
 
   return (
     <>
-      <button
-        type="button"
-        className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-[2px]"
-        onClick={handleBackdropClick}
-        aria-label="閉じる"
-      />
-      <div
-        className="fixed inset-x-0 bottom-0 z-[110] mx-auto max-w-md"
-        role="dialog"
-        aria-modal="true"
-        aria-label={`${entry.title} の詳細`}
-      >
+      <button type="button" className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-[2px]" onClick={handleBackdropClick} aria-label="閉じる" />
+      <div className="fixed inset-x-0 bottom-0 z-[110] mx-auto max-w-md" role="dialog" aria-modal="true" aria-label={`${entry.title} の詳細`}>
         <FocusTrap>
           <div className="max-h-[85dvh] overflow-y-auto rounded-t-[18px] bg-white pb-[max(1.5rem,calc(0.75rem+env(safe-area-inset-bottom,0px)))] pt-4 shadow-[0_-8px_32px_rgba(0,0,0,0.12)] animate-fade-in">
             <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-border" aria-hidden />
-
             <div className="px-5">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <RecordDateBlock iso={entry.date} />
                   <h3 className="mt-2 text-xl font-bold tracking-tight">{entry.title}</h3>
                 </div>
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="flex h-8 w-8 items-center justify-center rounded-full text-secondary transition-all active:bg-chip active:scale-95"
-                  aria-label="閉じる"
-                >
+                <button type="button" onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-full text-secondary transition-all active:bg-chip active:scale-95" aria-label="閉じる">
                   <X size={18} strokeWidth={1.5} />
                 </button>
               </div>
-
-              {/* Metrics */}
               <div className="mt-5 grid grid-cols-3 gap-2 rounded-[14px] bg-surface p-4">
                 <Metric value={entry.durationMin} unit="分" label="時間" />
                 <Metric value={entry.totalSets} unit="セット" label="合計" />
-                <Metric
-                  value={entry.totalVolume.toLocaleString()}
-                  unit="kg"
-                  label="総重量"
-                />
+                <Metric value={entry.totalVolume.toLocaleString()} unit="kg" label="総重量" />
               </div>
-
-              {/* All movements */}
               <div className="mt-5">
-                <p className="mb-2 text-xs font-title uppercase tracking-[0.12em] text-muted">
-                  種目
-                </p>
+                <p className="mb-2 text-xs font-title uppercase tracking-[0.12em] text-muted">種目</p>
                 <div className="space-y-2">
                   {entry.movements.map((m, i) => (
-                    <div
-                      key={i}
-                      className="flex items-center justify-between rounded-[14px] bg-surface px-4 py-3"
-                    >
+                    <div key={i} className="flex items-center justify-between rounded-[14px] bg-surface px-4 py-3">
                       <span className="text-sm font-bold">{m.name}</span>
-                      <span className="font-metric text-sm text-secondary">
-                        {m.weight}kg × {m.reps} × {m.sets}
-                      </span>
+                      <span className="font-metric text-sm text-secondary">{m.weight}kg × {m.reps} × {m.sets}</span>
                     </div>
                   ))}
                 </div>
               </div>
-
-              {/* Video link */}
               {videoCount > 0 && (
-                <Link
-                  href={`/videos?session=${entry.id}`}
-                  className="mt-4 flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-chip text-sm font-extrabold text-secondary transition-all active:scale-[0.98]"
-                >
+                <Link href={`/videos?session=${entry.id}`} className="mt-4 flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-chip text-sm font-extrabold text-secondary transition-all active:scale-[0.98]">
                   <Camera size={14} strokeWidth={2} />
                   撮影動画を見る ({videoCount}本)
                 </Link>
               )}
-
-              {/* Category chips */}
               <div className="mt-4 flex flex-wrap gap-1.5">
                 {entry.categories.map((c) => (
-                  <span
-                    key={c}
-                    className="rounded-full bg-chip px-3 py-1.5 text-[11px] font-extrabold text-secondary"
-                  >
-                    {c}
-                  </span>
+                  <span key={c} className="rounded-full bg-chip px-3 py-1.5 text-[11px] font-extrabold text-secondary">{c}</span>
                 ))}
               </div>
             </div>
@@ -263,15 +248,7 @@ function WorkoutDetailSheet({
   );
 }
 
-function Metric({
-  value,
-  unit,
-  label,
-}: {
-  value: number | string;
-  unit: string;
-  label: string;
-}) {
+function Metric({ value, unit, label }: { value: number | string; unit: string; label: string }) {
   return (
     <div className="text-center">
       <p className="flex items-baseline justify-center gap-0.5">

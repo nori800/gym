@@ -1,13 +1,19 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
+import { translateSupabaseAuthError } from "@/lib/supabase/translateAuthError";
+import { Loader2 } from "lucide-react";
 
 export default function SignupPage() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
-  const [errors, setErrors] = useState<{ email?: string; password?: string; confirm?: string }>({});
+  const [errors, setErrors] = useState<{ email?: string; password?: string; confirm?: string; server?: string }>({});
+  const [loading, setLoading] = useState(false);
 
   const validate = () => {
     const e: typeof errors = {};
@@ -21,9 +27,26 @@ export default function SignupPage() {
     return Object.keys(e).length === 0;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    if (!confirm) {
+      setErrors((prev) => ({ ...prev, confirm: "確認用パスワードを入力してください" }));
+      return;
+    }
     if (!validate()) return;
-    console.log("signup", { email, password });
+    setLoading(true);
+    setErrors({});
+
+    const supabase = createClient();
+    const { error } = await supabase.auth.signUp({ email, password });
+
+    if (error) {
+      setLoading(false);
+      setErrors({ server: translateSupabaseAuthError(error.message) });
+      return;
+    }
+
+    router.push("/dashboard");
+    router.refresh();
   };
 
   return (
@@ -31,6 +54,12 @@ export default function SignupPage() {
       <header className="mb-12">
         <h1 className="text-xl font-title">FormCheck</h1>
       </header>
+
+      {errors.server && (
+        <div className="mb-5 rounded-xl bg-danger/10 px-4 py-3 text-sm text-danger">
+          {errors.server}
+        </div>
+      )}
 
       <div className="space-y-5">
         <div>
@@ -43,7 +72,8 @@ export default function SignupPage() {
             onChange={(e) => setEmail(e.target.value)}
             onBlur={validate}
             placeholder="you@example.com"
-            className={`h-12 w-full rounded-lg border border-border bg-white px-4 text-sm text-primary placeholder:text-muted/60 focus:outline-none focus:ring-2 ${errors.email ? "ring-2 ring-danger" : "focus:ring-primary/10"}`}
+            disabled={loading}
+            className={`h-12 w-full rounded-lg border border-border bg-white px-4 text-sm text-primary placeholder:text-muted/60 focus:outline-none focus:ring-2 disabled:opacity-50 ${errors.email ? "ring-2 ring-danger" : "focus:ring-primary/10"}`}
           />
           {errors.email && <p className="mt-1 text-xs text-danger">{errors.email}</p>}
         </div>
@@ -57,7 +87,8 @@ export default function SignupPage() {
             onChange={(e) => setPassword(e.target.value)}
             onBlur={validate}
             placeholder="8 文字以上"
-            className={`h-12 w-full rounded-lg border border-border bg-white px-4 text-sm text-primary placeholder:text-muted/60 focus:outline-none focus:ring-2 ${errors.password ? "ring-2 ring-danger" : "focus:ring-primary/10"}`}
+            disabled={loading}
+            className={`h-12 w-full rounded-lg border border-border bg-white px-4 text-sm text-primary placeholder:text-muted/60 focus:outline-none focus:ring-2 disabled:opacity-50 ${errors.password ? "ring-2 ring-danger" : "focus:ring-primary/10"}`}
           />
           {errors.password && <p className="mt-1 text-xs text-danger">{errors.password}</p>}
         </div>
@@ -71,7 +102,8 @@ export default function SignupPage() {
             onChange={(e) => setConfirm(e.target.value)}
             onBlur={validate}
             placeholder="もう一度入力"
-            className={`h-12 w-full rounded-lg border border-border bg-white px-4 text-sm text-primary placeholder:text-muted/60 focus:outline-none focus:ring-2 ${errors.confirm ? "ring-2 ring-danger" : "focus:ring-primary/10"}`}
+            disabled={loading}
+            className={`h-12 w-full rounded-lg border border-border bg-white px-4 text-sm text-primary placeholder:text-muted/60 focus:outline-none focus:ring-2 disabled:opacity-50 ${errors.confirm ? "ring-2 ring-danger" : "focus:ring-primary/10"}`}
           />
           {errors.confirm && <p className="mt-1 text-xs text-danger">{errors.confirm}</p>}
         </div>
@@ -80,8 +112,10 @@ export default function SignupPage() {
       <button
         type="button"
         onClick={handleSubmit}
-        className="mt-8 min-h-[44px] w-full rounded-xl bg-inverse text-sm font-extrabold tracking-wide text-on-inverse transition-colors duration-150 active:scale-[0.98]"
+        disabled={loading}
+        className="mt-8 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-inverse text-sm font-extrabold tracking-wide text-on-inverse transition-colors duration-150 active:scale-[0.98] disabled:opacity-60"
       >
+        {loading && <Loader2 size={16} className="animate-spin" />}
         登録する
       </button>
 

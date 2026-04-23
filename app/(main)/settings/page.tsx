@@ -1,11 +1,16 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
-import { ChevronRight, LogIn, User, Bell, Trash2, X } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ChevronRight, LogIn, LogOut, User, Bell, Trash2, X, Loader2 } from "lucide-react";
 import { FocusTrap } from "@/components/common/FocusTrap";
+import { useAuth } from "@/lib/hooks/useAuth";
+import { createClient } from "@/lib/supabase/client";
 
 export default function SettingsPage() {
+  const router = useRouter();
+  const { user, loading: authLoading, signOut } = useAuth();
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const handleCacheClear = useCallback(() => {
@@ -13,6 +18,12 @@ export default function SettingsPage() {
     localStorage.removeItem("formcheck_onboarding_complete");
     setConfirmOpen(false);
   }, []);
+
+  const handleSignOut = useCallback(async () => {
+    await signOut();
+    router.push("/login");
+    router.refresh();
+  }, [signOut, router]);
 
   return (
     <div className="space-y-8">
@@ -24,19 +35,33 @@ export default function SettingsPage() {
           <User size={22} strokeWidth={1.5} className="text-muted" />
         </div>
         <div className="flex-1">
-          <p className="text-sm font-title">ゲストユーザー</p>
+          <p className="text-sm font-title">{user?.email ?? "ゲストユーザー"}</p>
+          {user && (
+            <p className="mt-0.5 text-[11px] text-muted">ログイン中</p>
+          )}
         </div>
-        <Link
-          href="/login"
-          className="flex min-h-[44px] items-center gap-1.5 rounded-xl bg-inverse px-4 py-2 text-xs font-extrabold tracking-wide text-on-inverse transition-all duration-150 active:scale-[0.98]"
-        >
-          <LogIn size={13} strokeWidth={1.5} />
-          ログイン
-        </Link>
+        {user ? (
+          <button
+            type="button"
+            onClick={handleSignOut}
+            className="flex min-h-[44px] items-center gap-1.5 rounded-xl border border-border px-4 py-2 text-xs font-extrabold tracking-wide text-secondary transition-all duration-150 active:scale-[0.98]"
+          >
+            <LogOut size={13} strokeWidth={1.5} />
+            ログアウト
+          </button>
+        ) : (
+          <Link
+            href="/login"
+            className="flex min-h-[44px] items-center gap-1.5 rounded-xl bg-inverse px-4 py-2 text-xs font-extrabold tracking-wide text-on-inverse transition-all duration-150 active:scale-[0.98]"
+          >
+            <LogIn size={13} strokeWidth={1.5} />
+            ログイン
+          </Link>
+        )}
       </section>
 
       {/* Profile */}
-      <ProfileForm />
+      {!authLoading && user && <ProfileForm userId={user.id} />}
 
       {/* General */}
       <section>
@@ -68,7 +93,6 @@ export default function SettingsPage() {
 
       <p className="pt-4 text-center text-xs text-muted">FormCheck v0.1.0</p>
 
-      {/* Cache clear confirmation dialog */}
       {confirmOpen && (
         <>
           <button
@@ -98,7 +122,7 @@ export default function SettingsPage() {
                   </button>
                 </div>
                 <p className="mt-2 text-sm leading-relaxed text-secondary">
-                  セッションデータとオンボーディング状態がリセットされます。ワークアウト履歴のモックデータには影響しません。
+                  セッションデータとオンボーディング状態がリセットされます。
                 </p>
                 <div className="mt-5 flex gap-2.5">
                   <button
@@ -125,18 +149,57 @@ export default function SettingsPage() {
   );
 }
 
-function ProfileForm() {
-  const [name, setName] = useState("ゲストユーザー");
+function ProfileForm({ userId }: { userId: string }) {
+  const supabase = createClient();
+  const [name, setName] = useState("");
   const [height, setHeight] = useState("");
   const [weight, setWeight] = useState("");
   const [goal, setGoal] = useState("");
+  const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [loaded, setLoaded] = useState(false);
 
-  const handleSave = () => {
-    localStorage.setItem("formcheck_profile", JSON.stringify({ name, height, weight, goal }));
+  useEffect(() => {
+    supabase
+      .from("profiles")
+      .select("display_name, height, weight, goal")
+      .eq("user_id", userId)
+      .single()
+      .then(({ data }) => {
+        if (data) {
+          setName(data.display_name || "");
+          setHeight(data.height != null ? String(data.height) : "");
+          setWeight(data.weight != null ? String(data.weight) : "");
+          setGoal(data.goal || "");
+        }
+        setLoaded(true);
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    await supabase
+      .from("profiles")
+      .update({
+        display_name: name,
+        height: height ? parseFloat(height) : null,
+        weight: weight ? parseFloat(weight) : null,
+        goal: goal || null,
+      })
+      .eq("user_id", userId);
+    setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
+
+  if (!loaded) {
+    return (
+      <section className="flex justify-center py-6">
+        <Loader2 size={20} className="animate-spin text-muted" />
+      </section>
+    );
+  }
 
   return (
     <section>
@@ -195,8 +258,10 @@ function ProfileForm() {
           <button
             type="button"
             onClick={handleSave}
-            className="min-h-[44px] w-full rounded-xl bg-inverse text-sm font-extrabold tracking-wide text-on-inverse transition-all duration-150 active:scale-[0.98]"
+            disabled={saving}
+            className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-inverse text-sm font-extrabold tracking-wide text-on-inverse transition-all duration-150 active:scale-[0.98] disabled:opacity-60"
           >
+            {saving && <Loader2 size={14} className="animate-spin" />}
             {saved ? "保存しました" : "保存"}
           </button>
         </div>

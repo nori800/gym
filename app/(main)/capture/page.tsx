@@ -2,9 +2,10 @@
 
 import { useRef, useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Grid3x3, Upload, X, Camera, CircleStop, Play, Pause } from "lucide-react";
+import { Grid3x3, Upload, X, Camera, CircleStop, Play, Pause, ArrowLeft } from "lucide-react";
 import { GridOverlay } from "@/components/capture/GridOverlay";
 import { PrimaryRecordButton } from "@/components/common/PrimaryRecordButton";
+import { pickRecorderMimeType } from "@/lib/capture/recorderMime";
 
 type CaptureState = "idle" | "previewing" | "recording" | "recorded";
 
@@ -27,7 +28,12 @@ export default function CapturePage() {
   const startCamera = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment", width: { ideal: 1080 }, height: { ideal: 1920 } },
+        video: {
+          facingMode: "environment",
+          width: { ideal: 1920, min: 1280 },
+          height: { ideal: 1080, min: 720 },
+          frameRate: { ideal: 30 },
+        },
         audio: true,
       });
       streamRef.current = stream;
@@ -55,10 +61,11 @@ export default function CapturePage() {
   const startRecording = useCallback(() => {
     if (!streamRef.current) return;
     chunksRef.current = [];
-    const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
-      ? "video/webm;codecs=vp9"
-      : "video/webm";
-    const recorder = new MediaRecorder(streamRef.current, { mimeType });
+    const { mimeType } = pickRecorderMimeType();
+    const recorder = new MediaRecorder(streamRef.current, {
+      mimeType,
+      videoBitsPerSecond: 5_000_000,
+    });
     recorder.ondataavailable = (e) => {
       if (e.data.size > 0) chunksRef.current.push(e.data);
     };
@@ -135,6 +142,14 @@ export default function CapturePage() {
   if (error === "camera") {
     return (
       <div className="flex flex-col items-center justify-center px-8 py-24 text-center">
+        <button
+          type="button"
+          onClick={() => router.back()}
+          className="absolute left-4 top-4 flex h-10 w-10 items-center justify-center rounded-full text-secondary transition-all active:bg-chip active:scale-95"
+          aria-label="戻る"
+        >
+          <ArrowLeft size={20} strokeWidth={1.5} />
+        </button>
         <Camera size={40} strokeWidth={1} className="mb-4 text-muted" />
         <p className="text-sm font-title">カメラにアクセスできません</p>
         <p className="mt-2 text-sm leading-relaxed text-secondary">
@@ -158,7 +173,7 @@ export default function CapturePage() {
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex flex-col bg-black">
+    <div className="fixed inset-0 z-[60] flex flex-col bg-black">
       {/* Viewfinder */}
       <div className="relative flex-1">
         {state === "recorded" && recordedUrl ? (
@@ -205,9 +220,18 @@ export default function CapturePage() {
         <GridOverlay visible={gridOn} />
 
         {/* Top controls */}
-        {state !== "recorded" && (
-          <>
-            <div className="absolute left-4 top-[env(safe-area-inset-top,16px)] z-10">
+        <div className="absolute left-0 right-0 top-0 z-10 flex items-center justify-between px-4 pt-[max(0.75rem,env(safe-area-inset-top,16px))]">
+          {/* Left: back / library */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => router.back()}
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm active:bg-white/20"
+              aria-label="戻る"
+            >
+              <ArrowLeft size={18} strokeWidth={1.5} />
+            </button>
+            {state !== "recorded" && (
               <button
                 type="button"
                 onClick={handleLibrary}
@@ -216,21 +240,23 @@ export default function CapturePage() {
                 <Upload size={13} strokeWidth={1.5} />
                 ライブラリ
               </button>
-            </div>
-            <div className="absolute right-4 top-[env(safe-area-inset-top,16px)] z-10">
-              <button
-                type="button"
-                onClick={() => setGridOn((p) => !p)}
-                className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold backdrop-blur-sm ${
-                  gridOn ? "bg-white/25 text-white" : "bg-black/50 text-white/70"
-                }`}
-              >
-                <Grid3x3 size={13} strokeWidth={1.5} />
-                {gridOn ? "ON" : "OFF"}
-              </button>
-            </div>
-          </>
-        )}
+            )}
+          </div>
+
+          {/* Right: grid toggle */}
+          {state !== "recorded" && (
+            <button
+              type="button"
+              onClick={() => setGridOn((p) => !p)}
+              className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold backdrop-blur-sm ${
+                gridOn ? "bg-white/25 text-white" : "bg-black/50 text-white/70"
+              }`}
+            >
+              <Grid3x3 size={13} strokeWidth={1.5} />
+              {gridOn ? "ON" : "OFF"}
+            </button>
+          )}
+        </div>
 
         {state === "recording" && (
           <div className="absolute left-1/2 top-[env(safe-area-inset-top,16px)] z-10 -translate-x-1/2 rounded-full bg-black/60 px-3 py-1 backdrop-blur-sm">
@@ -243,7 +269,7 @@ export default function CapturePage() {
       </div>
 
       {/* Controls */}
-      <div className="shrink-0 border-t border-white/10 bg-zinc-950 px-5 pb-[max(1rem,env(safe-area-inset-bottom,0px))] pt-4">
+      <div className="shrink-0 border-t border-white/10 bg-zinc-950 px-5 pb-[max(1.5rem,calc(0.75rem+env(safe-area-inset-bottom,0px)))] pt-3">
         {state === "recorded" ? (
           <div className="flex gap-3">
             <button

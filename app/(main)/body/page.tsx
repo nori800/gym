@@ -1,28 +1,77 @@
 "use client";
 
-import { useState } from "react";
-import { PenSquare, Scale } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { PenSquare, Scale, Loader2 } from "lucide-react";
 import { BodyDetail } from "@/components/body/BodyDetail";
 import { BodyLogForm } from "@/components/body/BodyLogForm";
-import { MOCK_BODY_LOGS } from "@/lib/mocks/bodyLogs";
 import { FocusTrap } from "@/components/common/FocusTrap";
+import { useAuth } from "@/lib/hooks/useAuth";
+import { createClient } from "@/lib/supabase/client";
+import { MOCK_BODY_LOGS } from "@/lib/mocks/bodyLogs";
+import type { BodyLog } from "@/types";
 
 export default function BodyPage() {
+  const { user, loading: authLoading } = useAuth();
   const [sheetOpen, setSheetOpen] = useState(false);
-  const isEmpty = MOCK_BODY_LOGS.length === 0;
+  const [logs, setLogs] = useState<BodyLog[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchLogs = useCallback(async () => {
+    if (!user) {
+      setLogs(MOCK_BODY_LOGS);
+      setLoading(false);
+      return;
+    }
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("body_logs")
+      .select("id, user_id, log_date, weight, body_fat_pct, created_at")
+      .eq("user_id", user.id)
+      .order("log_date", { ascending: true });
+
+    if (data && data.length > 0) {
+      setLogs(
+        data.map((d: { id: string; user_id: string; log_date: string; weight: number | null; body_fat_pct: number | null; created_at: string }) => ({
+          id: d.id,
+          user_id: d.user_id,
+          log_date: d.log_date,
+          weight: d.weight ?? 0,
+          body_fat: d.body_fat_pct ?? null,
+          created_at: d.created_at,
+        })),
+      );
+    } else {
+      setLogs(MOCK_BODY_LOGS);
+    }
+    setLoading(false);
+  }, [user]);
+
+  useEffect(() => {
+    if (!authLoading) fetchLogs();
+  }, [authLoading, fetchLogs]);
+
+  const handleSaved = useCallback(() => {
+    fetchLogs();
+  }, [fetchLogs]);
+
+  const isEmpty = logs.length === 0;
+
+  if (loading || authLoading) {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <Loader2 size={24} className="animate-spin text-muted" />
+      </div>
+    );
+  }
 
   return (
     <div className="relative min-h-[calc(100dvh-6rem)]">
       <header className="flex items-end justify-between">
         <div>
-          <p className="text-xs font-title uppercase tracking-[0.12em] text-muted">
-            Body
-          </p>
+          <p className="text-xs font-title uppercase tracking-[0.12em] text-muted">Body</p>
           <h1 className="mt-1 text-xl font-title tracking-tight">ボディログ</h1>
         </div>
-        <p className="pb-1 text-xs font-caption text-muted">
-          全 {MOCK_BODY_LOGS.length} 件
-        </p>
+        <p className="pb-1 text-xs font-caption text-muted">全 {logs.length} 件</p>
       </header>
 
       {isEmpty ? (
@@ -45,11 +94,10 @@ export default function BodyPage() {
         </div>
       ) : (
         <div className="mt-6">
-          <BodyDetail />
+          <BodyDetail logs={logs} />
         </div>
       )}
 
-      {/* Backdrop */}
       {sheetOpen && (
         <button
           type="button"
@@ -59,7 +107,6 @@ export default function BodyPage() {
         />
       )}
 
-      {/* Bottom sheet */}
       {sheetOpen && (
         <div
           className="pointer-events-none fixed inset-x-0 bottom-0 z-[110] mx-auto max-w-md"
@@ -69,13 +116,12 @@ export default function BodyPage() {
         >
           <FocusTrap>
             <div className="pointer-events-auto max-h-[min(92dvh,calc(100dvh-1rem))] overflow-y-auto rounded-t-[18px] animate-fade-in">
-              <BodyLogForm onClose={() => setSheetOpen(false)} />
+              <BodyLogForm onClose={() => setSheetOpen(false)} onSaved={handleSaved} />
             </div>
           </FocusTrap>
         </div>
       )}
 
-      {/* FAB */}
       {!sheetOpen && (
         <button
           type="button"

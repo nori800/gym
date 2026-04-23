@@ -2,17 +2,23 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Check, Camera, Dumbbell } from "lucide-react";
+import { ArrowLeft, Check, Camera, Dumbbell, Loader2 } from "lucide-react";
 import { MOVEMENTS } from "@/lib/mocks/movements";
-import { MOCK_WORKOUT_HISTORY } from "@/lib/mocks/workoutHistory";
 import { PrimaryRecordButton } from "@/components/common/PrimaryRecordButton";
 import { Stepper } from "@/components/workout/Stepper";
+import { useAuth } from "@/lib/hooks/useAuth";
+import { createClient } from "@/lib/supabase/client";
+import { inferVideoUploadMeta } from "@/lib/capture/recorderMime";
 
-type Phase = "input" | "saved";
+type Phase = "input" | "saving" | "saved";
+
+type RecentWorkout = { id: string; title: string; workout_date: string };
 
 export default function CaptureMetaPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [videoBlob, setVideoBlob] = useState<Blob | null>(null);
   const [duration, setDuration] = useState(0);
 
   const [exercise, setExercise] = useState("");
@@ -24,6 +30,7 @@ export default function CaptureMetaPage() {
 
   const [exerciseError, setExerciseError] = useState(false);
   const [phase, setPhase] = useState<Phase>("input");
+  const [recentWorkouts, setRecentWorkouts] = useState<RecentWorkout[]>([]);
 
   useEffect(() => {
     const url = sessionStorage.getItem("capturedVideoUrl");
@@ -34,52 +41,122 @@ export default function CaptureMetaPage() {
     }
     setVideoUrl(url);
     setDuration(dur ? parseInt(dur, 10) : 0);
+
+    fetch(url)
+      .then((r) => r.blob())
+      .then(setVideoBlob)
+      .catch(() => {});
   }, [router]);
 
-  const handleSave = useCallback(() => {
+  useEffect(() => {
+    if (!user) return;
+    const supabase = createClient();
+    supabase
+      .from("workouts")
+      .select("id, title, workout_date")
+      .eq("user_id", user.id)
+      .order("workout_date", { ascending: false })
+      .limit(10)
+      .then(({ data }) => {
+        if (data) setRecentWorkouts(data as RecentWorkout[]);
+      });
+  }, [user]);
+
+  const uploadAndSave = useCallback(
+    async (videoOnly: boolean) => {
+      if (!user || !videoBlob) return false;
+
+      const supabase = createClient();
+      const videoId = crypto.randomUUID();
+      const { fileExt, contentType } = inferVideoUploadMeta(videoBlob);
+      const filePath = `${user.id}/${videoId}${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("videos")
+        .upload(filePath, videoBlob, { contentType });
+
+      if (uploadError) {
+        console.error("video upload error:", uploadError.message);
+        return false;
+      }
+
+      const today = new Date().toISOString().split("T")[0];
+
+      const { error: insertError } = await supabase.from("videos").insert({
+        id: videoId,
+        user_id: user.id,
+        title: videoOnly ? (exercise || "無題の動画") : `${exercise} ${weight ? weight + "kg" : ""}`.trim(),
+        exercise_type: exercise || "",
+        shot_date: today,
+        file_path: filePath,
+        duration,
+        memo: memo || null,
+        workout_id: linkedWorkoutId || null,
+      });
+
+      if (insertError) {
+        console.error("video insert error:", insertError.message);
+        return false;
+      }
+      return true;
+    },
+    [user, videoBlob, exercise, weight, duration, memo, linkedWorkoutId],
+  );
+
+  const handleSave = useCallback(async () => {
     if (!exercise) {
       setExerciseError(true);
       return;
     }
 
-    const record = {
-      exercise,
-      weight: weight || null,
-      reps: reps || null,
-      sets: sets || null,
-      memo: memo || null,
-      videoUrl,
-      duration,
-      workout_session_id: linkedWorkoutId || null,
-    };
-    console.log("save set with video", record);
-    if (linkedWorkoutId) {
-      sessionStorage.setItem("captureLinkedWorkoutId", linkedWorkoutId);
+    setPhase("saving");
+
+    if (user && videoBlob) {
+      const ok = await uploadAndSave(false);
+      if (!ok) {
+        setPhase("input");
+        return;
+      }
     } else {
-      sessionStorage.removeItem("captureLinkedWorkoutId");
+      console.log("save set with video (guest)", { exercise, weight, reps, sets, memo, videoUrl, duration, linkedWorkoutId });
     }
 
     sessionStorage.removeItem("capturedVideoUrl");
     sessionStorage.removeItem("capturedDuration");
     setPhase("saved");
-  }, [exercise, weight, reps, sets, memo, videoUrl, duration, linkedWorkoutId]);
+  }, [exercise, user, videoBlob, uploadAndSave, weight, reps, sets, memo, videoUrl, duration, linkedWorkoutId]);
 
-  const handleVideoOnly = useCallback(() => {
-    console.log("save video only", {
-      exercise: exercise || null,
-      videoUrl,
-      duration,
-      workout_session_id: linkedWorkoutId || null,
-    });
+  const handleVideoOnly = useCallback(async () => {
+    setPhase("saving");
+
+    if (user && videoBlob) {
+      const ok = await uploadAndSave(true);
+      if (!ok) {
+        setPhase("input");
+        return;
+      }
+    } else {
+      console.log("save video only (guest)", { exercise, videoUrl, duration, linkedWorkoutId });
+    }
+
     sessionStorage.removeItem("capturedVideoUrl");
     sessionStorage.removeItem("capturedDuration");
     router.push("/videos");
-  }, [exercise, videoUrl, duration, router, linkedWorkoutId]);
+  }, [user, videoBlob, uploadAndSave, exercise, videoUrl, duration, router, linkedWorkoutId]);
 
   const fmtDuration = (s: number) =>
     `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
   if (!videoUrl) return null;
+
+  if (phase === "saving") {
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center px-6">
+        <Loader2 size={32} className="animate-spin text-muted" />
+        <p className="mt-4 text-sm text-secondary">保存中…</p>
+      </div>
+    );
+  }
 
   if (phase === "saved") {
     const summary = [
@@ -91,7 +168,7 @@ export default function CaptureMetaPage() {
       .filter(Boolean)
       .join(" · ");
 
-    const linkedTitle = MOCK_WORKOUT_HISTORY.find((w) => w.id === linkedWorkoutId)?.title;
+    const linkedTitle = recentWorkouts.find((w) => w.id === linkedWorkoutId)?.title;
 
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center px-6">
@@ -143,9 +220,7 @@ export default function CaptureMetaPage() {
           <ArrowLeft size={20} strokeWidth={1.5} />
         </button>
         <div>
-          <p className="text-xs font-title uppercase tracking-[0.12em] text-muted">
-            Capture
-          </p>
+          <p className="text-xs font-title uppercase tracking-[0.12em] text-muted">Capture</p>
           <h1 className="text-lg font-bold tracking-tight">セットを記録</h1>
         </div>
       </div>
@@ -158,60 +233,48 @@ export default function CaptureMetaPage() {
         </div>
       </div>
 
-      {/* Info callout */}
-      <p className="rounded-[18px] bg-white px-[18px] py-3 text-[12px] leading-relaxed text-secondary shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
-        下で<strong className="text-primary">ワークアウトを選ぶ</strong>
-        と、履歴のセッションと動画がひも付きます。未選択の場合は動画ライブラリのみに保存されます。
-      </p>
-
-      {/* Workout link selector */}
-      <div className="overflow-hidden rounded-[18px] bg-white shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
-        <label className="block border-b border-border px-[18px] pt-4 pb-2.5 text-xs font-extrabold uppercase tracking-[0.12em] text-secondary">
-          ワークアウトに紐付ける
-        </label>
-        <select
-          value={linkedWorkoutId}
-          onChange={(e) => setLinkedWorkoutId(e.target.value)}
-          className="min-h-[50px] w-full bg-white px-[18px] text-sm font-semibold text-primary focus:outline-none"
-        >
-          <option value="">紐付けない</option>
-          {MOCK_WORKOUT_HISTORY.map((w) => (
-            <option key={w.id} value={w.id}>
-              {w.title}（{w.date}）
-            </option>
-          ))}
-        </select>
+      {/* EXERCISE */}
+      <div className="px-[18px]">
+        <h4 className="text-xs font-title uppercase tracking-wider text-primary">種目</h4>
+        <p className="mt-1 text-[12px] leading-relaxed text-secondary">
+          撮影したフォームの種目を選んでください
+        </p>
       </div>
 
-      {/* Exercise selector — unified with MOVEMENTS */}
       <div className="overflow-hidden rounded-[18px] bg-white shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
-        <select
-          value={exercise}
-          onChange={(e) => {
-            setExercise(e.target.value);
-            setExerciseError(false);
-          }}
-          className={`min-h-[50px] w-full bg-white px-[18px] text-sm font-semibold text-primary focus:outline-none ${
-            exerciseError ? "ring-2 ring-danger/40 ring-inset" : ""
-          }`}
-        >
-          <option value="">種目を選択</option>
-          {Array.from(categorizedMovements.entries()).map(([cat, movements]) => (
-            <optgroup key={cat} label={cat}>
-              {movements.map((m) => (
-                <option key={m.id} value={m.nameJa}>
-                  {m.nameJa}
-                </option>
-              ))}
-            </optgroup>
-          ))}
-        </select>
+        <div className="flex min-h-[62px] items-center px-[18px]">
+          <select
+            value={exercise}
+            onChange={(e) => { setExercise(e.target.value); setExerciseError(false); }}
+            className={`min-h-[50px] w-full bg-transparent text-sm font-semibold text-primary focus:outline-none ${exerciseError ? "text-danger" : ""}`}
+          >
+            <option value="">種目を選択</option>
+            {Array.from(categorizedMovements.entries()).map(([cat, movements]) => (
+              <optgroup key={cat} label={cat}>
+                {movements.map((m) => (
+                  <option key={m.id} value={m.nameJa}>{m.nameJa}</option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </div>
         {exerciseError && (
-          <p className="px-[18px] pb-2.5 text-xs text-danger">種目を選択してください</p>
+          <div className="border-t border-danger/20 px-[18px] py-2">
+            <p className="text-xs text-danger">種目を選択してください</p>
+          </div>
         )}
       </div>
 
-      {/* Metrics */}
+      {/* SETS & REPS */}
+      <div className="px-[18px]">
+        <h4 className="text-xs font-title uppercase tracking-wider text-primary">
+          セット & レップス
+        </h4>
+        <p className="mt-1 text-[12px] leading-relaxed text-secondary">
+          セット＝同じ動作の繰り返しを1まとまりにした単位。レップ（回数）＝1セット内で動作を行う回数です。
+        </p>
+      </div>
+
       <div className="overflow-hidden rounded-[18px] bg-white shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
         <div className="flex min-h-[62px] items-center justify-between px-[18px]">
           <span className="text-lg font-semibold">重量</span>
@@ -230,19 +293,54 @@ export default function CaptureMetaPage() {
         </div>
       </div>
 
-      {/* Memo */}
+      <p className="px-1 text-xs text-muted">
+        数字をタップで直接入力、± で細かく調整できます
+      </p>
+
+      {/* MEMO */}
+      <div className="px-[18px]">
+        <h4 className="text-xs font-title uppercase tracking-wider text-primary">メモ</h4>
+      </div>
+
       <div className="overflow-hidden rounded-[18px] bg-white shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
         <textarea
           value={memo}
           onChange={(e) => setMemo(e.target.value)}
           rows={2}
           maxLength={500}
-          placeholder="メモ"
+          placeholder="フォームの気づきなど"
           className="w-full bg-white px-[18px] py-3.5 text-sm text-primary placeholder:text-muted focus:outline-none"
         />
       </div>
 
-      {/* Actions */}
+      {/* LINK WORKOUT */}
+      <div className="px-[18px]">
+        <h4 className="text-xs font-title uppercase tracking-wider text-primary">
+          ワークアウトに紐付ける
+        </h4>
+        <p className="mt-1 text-[12px] leading-relaxed text-secondary">
+          履歴のセッションと動画がひも付きます。未選択の場合は動画ライブラリのみに保存されます。
+        </p>
+      </div>
+
+      <div className="overflow-hidden rounded-[18px] bg-white shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
+        <div className="flex min-h-[62px] items-center px-[18px]">
+          <select
+            value={linkedWorkoutId}
+            onChange={(e) => setLinkedWorkoutId(e.target.value)}
+            className="min-h-[50px] w-full bg-transparent text-sm font-semibold text-primary focus:outline-none"
+          >
+            <option value="">紐付けない</option>
+            {recentWorkouts.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.title}（{w.workout_date}）
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Save buttons */}
       <div className="space-y-2.5">
         <PrimaryRecordButton type="button" onClick={handleSave}>
           <Dumbbell size={16} strokeWidth={1.5} />

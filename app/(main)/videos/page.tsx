@@ -1,27 +1,71 @@
 "use client";
 
-import { useState, useMemo, Suspense } from "react";
+import { useState, useMemo, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ChevronDown, Video as VideoIcon } from "lucide-react";
+import { ChevronDown, Video as VideoIcon, Loader2 } from "lucide-react";
 import { MOCK_VIDEOS } from "@/lib/mocks/videos";
 import { EXERCISE_TYPES } from "@/lib/mocks/exercises";
 import { formatDate } from "@/lib/utils/formatDate";
 import { getWorkoutSessionById } from "@/lib/mocks/workoutHistory";
+import { useAuth } from "@/lib/hooks/useAuth";
+import { createClient } from "@/lib/supabase/client";
+import type { Video } from "@/types";
 
 type SortKey = "newest" | "oldest";
 
 function VideosPageInner() {
   const searchParams = useSearchParams();
   const sessionFilter = searchParams.get("session");
+  const { user, loading: authLoading } = useAuth();
 
+  const [videos, setVideos] = useState<Video[]>([]);
+  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>("all");
   const [sort, setSort] = useState<SortKey>("newest");
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      setVideos(MOCK_VIDEOS);
+      setLoading(false);
+      return;
+    }
+    const supabase = createClient();
+    supabase
+      .from("videos")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .then(({ data }) => {
+        if (data && data.length > 0) {
+          setVideos(
+            data.map((v) => ({
+              id: v.id,
+              user_id: v.user_id,
+              title: v.title,
+              exercise_type: v.exercise_type,
+              shot_date: v.shot_date ?? "",
+              file_path: v.file_path,
+              thumbnail_path: v.thumbnail_path,
+              duration: v.duration,
+              memo: v.memo ?? "",
+              workout_session_id: v.workout_id,
+              created_at: v.created_at,
+              updated_at: v.updated_at,
+            })),
+          );
+        } else {
+          setVideos(MOCK_VIDEOS);
+        }
+        setLoading(false);
+      });
+  }, [user, authLoading]);
 
   const sessionTitle = sessionFilter ? getWorkoutSessionById(sessionFilter)?.title : null;
 
   const filtered = useMemo(() => {
-    let list = [...MOCK_VIDEOS];
+    let list = [...videos];
     if (sessionFilter) {
       list = list.filter((v) => v.workout_session_id === sessionFilter);
     }
@@ -32,14 +76,20 @@ function VideosPageInner() {
         : a.shot_date.localeCompare(b.shot_date),
     );
     return list;
-  }, [filter, sort, sessionFilter]);
+  }, [videos, filter, sort, sessionFilter]);
+
+  if (loading || authLoading) {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <Loader2 size={24} className="animate-spin text-muted" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-[11px] font-caption uppercase tracking-[0.12em] text-muted">
-          Library
-        </p>
+        <p className="text-[11px] font-caption uppercase tracking-[0.12em] text-muted">Library</p>
         <h1 className="mt-0.5 text-[22px] font-bold tracking-tight">動画ライブラリ</h1>
       </div>
 
@@ -49,16 +99,12 @@ function VideosPageInner() {
             <span className="font-bold text-primary">{sessionTitle ?? "このセッション"}</span>
             に紐付いた動画
           </p>
-          <Link
-            href="/videos"
-            className="shrink-0 text-[11px] font-bold text-muted underline-offset-2 hover:text-primary"
-          >
+          <Link href="/videos" className="shrink-0 text-[11px] font-bold text-muted underline-offset-2 hover:text-primary">
             解除
           </Link>
         </div>
       )}
 
-      {/* Filters */}
       <div className="flex gap-2">
         <div className="relative flex-1">
           <select
@@ -69,9 +115,7 @@ function VideosPageInner() {
           >
             <option value="all">すべて</option>
             {EXERCISE_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
+              <option key={t} value={t}>{t}</option>
             ))}
           </select>
           <ChevronDown size={14} className="pointer-events-none absolute right-2.5 top-2.5 text-muted" />

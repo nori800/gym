@@ -4,6 +4,12 @@ import { useCallback, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { formatJapaneseLongDate } from "@/lib/utils/formatRecordDate";
 import { FocusTrap } from "@/components/common/FocusTrap";
+import {
+  dayNumberTextClass,
+  dayToneFromIso,
+  japaneseHolidayName,
+  weekdayHeaderClass,
+} from "@/lib/calendar/jpCalendarTone";
 
 function parseIsoToParts(iso: string): { y: number; m: number; d: number } {
   const [ys, ms, ds] = iso.split("-");
@@ -203,32 +209,53 @@ export function DatePickerField({ value, onChange, "aria-label": ariaLabel = "�
                   </div>
                 )}
 
-                {!yearPickerOpen && <div className="mt-4 grid grid-cols-7 gap-y-1 text-center">
-                  {WEEKDAYS.map((w) => (
-                    <span key={w} className="pb-1 text-[11px] font-bold text-muted">
+                {!yearPickerOpen && (
+                  <div className="mt-4 grid grid-cols-7 gap-y-1 text-center">
+                  {WEEKDAYS.map((w, col) => (
+                    <span
+                      key={w}
+                      className={`pb-1 text-[11px] font-bold ${weekdayHeaderClass(col)}`}
+                    >
                       {w}
                     </span>
                   ))}
                   {cells.map((c, i) => {
                     const selected = c.iso === value;
+                    const tone = dayToneFromIso(c.iso);
+                    const holName = japaneseHolidayName(c.iso);
+                    const toneClass = selected ? "text-on-inverse" : dayNumberTextClass(tone, c.inCurrentMonth);
                     return (
                       <button
                         key={`${c.iso}-${i}`}
                         type="button"
                         onClick={() => pick(c.iso)}
+                        aria-label={
+                          holName
+                            ? `${c.day}日、${holName}`
+                            : `${c.day}日`
+                        }
                         className={`mx-auto flex h-10 w-10 items-center justify-center rounded-full text-sm font-metric transition-all duration-150 active:scale-95 ${
                           selected
-                            ? "bg-inverse font-bold text-on-inverse shadow-[0_2px_8px_rgba(0,0,0,0.12)]"
-                            : c.inCurrentMonth
-                              ? "text-primary hover:bg-chip"
-                              : "text-muted/50 hover:bg-chip/60"
+                            ? `bg-inverse font-bold shadow-[0_2px_8px_rgba(0,0,0,0.12)] ${toneClass}`
+                            : `${toneClass} ${
+                                c.inCurrentMonth ? "hover:bg-chip" : "hover:bg-chip/60"
+                              }`
                         }`}
                       >
                         {c.day}
                       </button>
                     );
                   })}
-                </div>}
+                  <p className="col-span-7 mt-2 text-left text-[10px] leading-relaxed text-secondary">
+                    <span className="font-bold text-red-600">日</span>
+                    <span className="text-muted">・</span>
+                    <span className="font-bold text-blue-600">土</span>
+                    <span className="text-muted">・</span>
+                    <span className="font-bold text-rose-700">祝</span>
+                    <span className="text-muted">（振替休日を含む）</span>
+                  </p>
+                  </div>
+                )}
 
                 <button
                   type="button"

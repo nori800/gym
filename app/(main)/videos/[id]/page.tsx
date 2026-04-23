@@ -5,10 +5,13 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft, Play, Pause, SkipBack, SkipForward,
-  Pencil, Layers, ChevronDown, ChevronUp,
+  Pencil, Layers, ChevronDown, ChevronUp, Loader2,
 } from "lucide-react";
 import { MOCK_VIDEOS } from "@/lib/mocks/videos";
 import { getWorkoutSessionById } from "@/lib/mocks/workoutHistory";
+import { useAuth } from "@/lib/hooks/useAuth";
+import { createClient } from "@/lib/supabase/client";
+import type { Video } from "@/types";
 import { VideoOverlay } from "@/components/player/VideoOverlay";
 import { DrawingCanvas, type DrawTool, type DrawShape } from "@/components/player/DrawingCanvas";
 import { OverlayControls } from "@/components/player/OverlayControls";
@@ -19,15 +22,21 @@ type Panel = "overlay" | "draw" | null;
 
 const SPEED_OPTIONS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2];
 
+type RecentWorkout = { id: string; title: string; workout_date: string };
+
 export default function VideoDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const video = MOCK_VIDEOS.find((v) => v.id === id);
+  const { user, loading: authLoading } = useAuth();
+
+  const [video, setVideo] = useState<Video | null>(null);
+  const [videoSrc, setVideoSrc] = useState<string | null>(null);
+  const [dataLoading, setDataLoading] = useState(true);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(video?.duration ?? 0);
+  const [duration, setDuration] = useState(0);
   const [speed, setSpeed] = useState(1);
   const [speedOpen, setSpeedOpen] = useState(false);
   const [seeking, setSeeking] = useState(false);
@@ -43,15 +52,170 @@ export default function VideoDetailPage() {
 
   const [panel, setPanel] = useState<Panel>(null);
 
-  const [memo, setMemo] = useState(video?.memo ?? "");
+  const [memo, setMemo] = useState("");
   const [memoOpen, setMemoOpen] = useState(false);
 
-  const togglePlay = useCallback(() => {
+  const [linkedWorkoutTitle, setLinkedWorkoutTitle] = useState<string | null>(null);
+  const [recentWorkouts, setRecentWorkouts] = useState<RecentWorkout[]>([]);
+  const [pendingWorkoutId, setPendingWorkoutId] = useState("");
+  const [linkSaving, setLinkSaving] = useState(false);
+
+  const [playbackError, setPlaybackError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (authLoading) return;
+
+    if (!user) {
+      setLinkedWorkoutTitle(null);
+      setRecentWorkouts([]);
+      setVideoSrc(null);
+      const mock = MOCK_VIDEOS.find((v) => v.id === id);
+      if (mock) {
+        setVideo(mock);
+        setDuration(mock.duration ?? 0);
+        setMemo(mock.memo ?? "");
+      }
+      setDataLoading(false);
+      return;
+    }
+
+    const supabase = createClient();
+    (async () => {
+      const { data } = await supabase
+        .from("videos")
+        .select("*")
+        .eq("id", id)
+        .single();
+
+      if (!data) {
+        setDataLoading(false);
+        return;
+      }
+
+      const v: Video = {
+        id: data.id,
+        user_id: data.user_id,
+        title: data.title,
+        exercise_type: data.exercise_type,
+        shot_date: data.shot_date ?? "",
+        file_path: data.file_path,
+        thumbnail_path: data.thumbnail_path,
+        duration: data.duration,
+        memo: data.memo ?? "",
+        workout_session_id: data.workout_id,
+        created_at: data.created_at,
+        updated_at: data.updated_at,
+      };
+
+      setVideo(v);
+      setDuration(v.duration ?? 0);
+      setMemo(v.memo);
+
+      if (data.file_path) {
+        const { data: signed, error: signErr } = await supabase.storage
+          .from("videos")
+          .createSignedUrl(data.file_path, 3600);
+
+        if (signed?.signedUrl) {
+          setVideoSrc(signed.signedUrl);
+        } else if (signErr) {
+          console.error("signed url error:", signErr.message);
+          setPlaybackError("動画の読み込みURLを取得できませんでした。Storage の権限を確認してください。");
+        }
+      }
+
+      if (data.workout_id) {
+        const { data: wo } = await supabase
+          .from("workouts")
+          .select("title")
+          .eq("id", data.workout_id)
+          .single();
+        if (wo?.title) setLinkedWorkoutTitle(wo.title);
+      } else {
+        setLinkedWorkoutTitle(null);
+      }
+
+      const { data: list } = await supabase
+        .from("workouts")
+        .select("id, title, workout_date")
+        .eq("user_id", user.id)
+        .order("workout_date", { ascending: false })
+        .limit(20);
+      if (list) setRecentWorkouts(list as RecentWorkout[]);
+
+      setDataLoading(false);
+    })();
+  }, [id, user, authLoading]);
+
+  useEffect(() => {
+    if (!video) return;
+    setPendingWorkoutId(video.workout_session_id ?? "");
+  }, [video?.id, video?.workout_session_id]);
+
+  useEffect(() => {
+    if (videoSrc) setPlaybackError(null);
+  }, [videoSrc]);
+
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el || !videoSrc) return;
+    el.load();
+  }, [videoSrc]);
+
+  const handleLinkWorkout = useCallback(async () => {
+    if (!user || !video) return;
+    setLinkSaving(true);
+    const supabase = createClient();
+    const nextId = pendingWorkoutId || null;
+    const { error } = await supabase
+      .from("videos")
+      .update({ workout_id: nextId })
+      .eq("id", video.id)
+      .eq("user_id", user.id);
+
+    if (error) {
+      console.error("video workout link error:", error.message);
+      setLinkSaving(false);
+      return;
+    }
+
+    setVideo((prev) => (prev ? { ...prev, workout_session_id: nextId } : null));
+
+    if (!nextId) {
+      setLinkedWorkoutTitle(null);
+    } else {
+      const hit = recentWorkouts.find((w) => w.id === nextId);
+      if (hit?.title) {
+        setLinkedWorkoutTitle(hit.title);
+      } else {
+        const { data: wo } = await supabase
+          .from("workouts")
+          .select("title")
+          .eq("id", nextId)
+          .single();
+        setLinkedWorkoutTitle(wo?.title ?? null);
+      }
+    }
+
+    setLinkSaving(false);
+  }, [user, video, pendingWorkoutId, recentWorkouts]);
+
+  const togglePlay = useCallback(async () => {
     const v = videoRef.current;
-    if (!v) return;
-    if (v.paused) { v.play(); setPlaying(true); }
-    else { v.pause(); setPlaying(false); }
-  }, []);
+    if (!v || !videoSrc) return;
+    if (v.paused) {
+      try {
+        await v.play();
+        setPlaying(true);
+        setPlaybackError(null);
+      } catch {
+        setPlaying(false);
+      }
+    } else {
+      v.pause();
+      setPlaying(false);
+    }
+  }, [videoSrc]);
 
   const skip = useCallback((delta: number) => {
     const v = videoRef.current;
@@ -118,6 +282,14 @@ export default function VideoDetailPage() {
     return `${m}:${String(sec).padStart(2, "0")}`;
   };
 
+  if (dataLoading || authLoading) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center">
+        <Loader2 size={24} className="animate-spin text-muted" />
+      </div>
+    );
+  }
+
   if (!video) {
     return (
       <div className="space-y-6">
@@ -132,7 +304,7 @@ export default function VideoDetailPage() {
   const linkedSession = getWorkoutSessionById(video.workout_session_id);
 
   return (
-    <div className="fixed inset-0 z-40 flex flex-col">
+    <div className="fixed inset-0 z-[60] flex flex-col">
       {/* Header — 動画の外に独立配置 */}
       <div className="shrink-0 bg-black px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top,0px))]">
         <div className="flex items-center gap-3">
@@ -141,12 +313,12 @@ export default function VideoDetailPage() {
           </button>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-title text-white">{video.title}</p>
-            {linkedSession && (
+            {video.workout_session_id && (
               <Link
                 href={`/videos?session=${video.workout_session_id}`}
                 className="mt-1 inline-block truncate text-[11px] font-semibold text-white/55 underline-offset-2 hover:text-white/90"
               >
-                ワークアウト: {linkedSession.title}
+                ワークアウト: {linkedWorkoutTitle ?? linkedSession?.title ?? "セッション"}
               </Link>
             )}
           </div>
@@ -157,17 +329,56 @@ export default function VideoDetailPage() {
       </div>
 
       {/* Video area */}
-      <div className="relative flex-1 bg-black">
+      <div className="relative min-h-0 flex-1 bg-black">
         <video
           ref={videoRef}
+          key={videoSrc ?? "no-src"}
+          src={videoSrc ?? undefined}
           className="absolute inset-0 h-full w-full object-contain"
           playsInline
           preload="metadata"
+          onError={() => {
+            if (!videoSrc) return;
+            setPlaying(false);
+            const isWebm = video.file_path?.endsWith(".webm");
+            setPlaybackError(
+              isWebm
+                ? "この動画は WebM 形式のため、Safari では再生できません。Chrome で開くか、撮り直すと MP4 で保存されます。"
+                : "動画を読み込めませんでした。ネットワークを確認してリロードしてください。",
+            );
+          }}
         />
 
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <p className="text-xs text-white/40">ダミー動画プレビュー</p>
-        </div>
+        {!videoSrc && !playbackError && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center">
+            <Loader2 size={24} className="animate-spin text-white/40" />
+          </div>
+        )}
+
+        {playbackError && (
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-black/80 px-6 text-center">
+            <p className="text-sm leading-relaxed text-white/90">{playbackError}</p>
+            <div className="flex flex-wrap justify-center gap-2">
+              {videoSrc && (
+                <a
+                  href={videoSrc}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-full bg-white/15 px-4 py-2 text-xs font-bold text-white backdrop-blur-sm transition-colors active:bg-white/25"
+                >
+                  新しいタブで開く
+                </a>
+              )}
+              <button
+                type="button"
+                onClick={() => router.push("/capture")}
+                className="rounded-full bg-accent/80 px-4 py-2 text-xs font-bold text-primary backdrop-blur-sm transition-colors active:bg-accent"
+              >
+                撮り直す
+              </button>
+            </div>
+          </div>
+        )}
 
         <VideoOverlay
           activeGrids={activeGrids}
@@ -187,7 +398,40 @@ export default function VideoDetailPage() {
       </div>
 
       {/* Controls area */}
-      <div className="shrink-0 bg-white px-4 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] pt-3">
+      <div className="shrink-0 bg-white px-4 pb-[max(1.25rem,calc(0.75rem+env(safe-area-inset-bottom,0px)))] pt-3">
+        {user && (
+          <div className="mb-3 overflow-hidden rounded-[14px] border border-border bg-surface px-3 py-3 shadow-[0_0_0_1px_rgba(0,0,0,.03)]">
+            <p className="text-[10px] font-title uppercase tracking-[0.12em] text-muted">ワークアウト</p>
+            <p className="mt-1 text-[12px] leading-relaxed text-secondary">
+              履歴のセッションにこの動画を紐付けます
+            </p>
+            <select
+              value={pendingWorkoutId}
+              onChange={(e) => setPendingWorkoutId(e.target.value)}
+              aria-label="紐付けるワークアウト"
+              className="mt-2 min-h-[44px] w-full rounded-lg border border-border bg-white px-3 text-sm font-semibold text-primary focus:outline-none focus:ring-2 focus:ring-primary/10"
+            >
+              <option value="">紐付けなし</option>
+              {recentWorkouts.map((w) => (
+                <option key={w.id} value={w.id}>
+                  {w.title}（{w.workout_date}）
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={handleLinkWorkout}
+              disabled={
+                linkSaving || pendingWorkoutId === (video.workout_session_id ?? "")
+              }
+              className="mt-2 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-inverse text-sm font-extrabold tracking-wide text-on-inverse transition-all duration-150 active:scale-[0.98] disabled:opacity-40"
+            >
+              {linkSaving && <Loader2 size={16} className="animate-spin" />}
+              ワークアウトに登録
+            </button>
+          </div>
+        )}
+
         {/* Seek bar */}
         <div className="mb-2 flex items-center gap-2">
           <span className="w-9 text-right text-[10px] font-metric text-muted">{fmtTime(currentTime)}</span>

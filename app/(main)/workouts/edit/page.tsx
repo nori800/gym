@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { X, Pencil, HelpCircle, Camera } from "lucide-react";
+import { X, Pencil, HelpCircle, Camera, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { DatePickerField } from "@/components/common/DatePickerField";
 import type { MovementConfig, WorkoutDraft } from "@/types/workout";
@@ -13,6 +13,8 @@ import { MovementListView } from "@/components/workout/MovementListView";
 import { MovementDetailView } from "@/components/workout/MovementDetailView";
 import { Toast } from "@/components/workout/Toast";
 import { BlockExplainerModal } from "@/components/workout/BlockExplainerModal";
+import { useAuth } from "@/lib/hooks/useAuth";
+import { createClient } from "@/lib/supabase/client";
 
 type View =
   | { screen: "editor" }
@@ -23,6 +25,8 @@ type TransitionDir = "forward" | "back" | "none";
 
 export default function WorkoutEditPage() {
   const router = useRouter();
+  const { user } = useAuth();
+  const [saving, setSaving] = useState(false);
   const transitionRef = useRef<TransitionDir>("none");
 
   const [draft, setDraft] = useState<WorkoutDraft>(() => {
@@ -108,10 +112,70 @@ export default function WorkoutEditPage() {
     router.push("/workouts");
   }, [router]);
 
-  const handleSave = useCallback(() => {
-    console.log("save workout", draft);
+  const handleSave = useCallback(async () => {
+    if (!user) {
+      console.log("save workout (guest)", draft);
+      router.push("/workouts");
+      return;
+    }
+
+    setSaving(true);
+    const supabase = createClient();
+
+    const allMovements = draft.blocks.flatMap((b) => b.movements);
+    const totalSets = allMovements.reduce((s, m) => s + m.sets, 0);
+    const totalVolume = allMovements.reduce((s, m) => {
+      const avgWeight = m.perSetWeight.length > 0
+        ? m.perSetWeight.reduce((a, w) => a + w, 0) / m.perSetWeight.length
+        : 0;
+      return s + avgWeight * m.reps * m.sets;
+    }, 0);
+    const categories = [...new Set(
+      allMovements
+        .map((m) => getMovementById(m.movementId)?.categoryJa)
+        .filter((c): c is string => !!c),
+    )];
+
+    const blocksJson = draft.blocks.map((b) => ({
+      name: b.name,
+      movements: b.movements.map((m) => {
+        const mv = getMovementById(m.movementId);
+        return {
+          movementId: m.movementId,
+          nameJa: mv?.nameJa ?? "",
+          categoryJa: mv?.categoryJa ?? "",
+          sets: m.sets,
+          reps: m.reps,
+          weight: m.perSetWeight[0] ?? 0,
+          perSetWeight: m.perSetWeight,
+          perSetReps: m.perSetReps,
+          weightMode: m.weightMode,
+          assistance: m.assistanceType,
+        };
+      }),
+    }));
+
+    const { error } = await supabase.from("workouts").insert({
+      user_id: user.id,
+      title: draft.title,
+      workout_date: draft.date,
+      description: draft.description,
+      blocks_json: blocksJson,
+      total_sets: totalSets,
+      total_volume: totalVolume,
+      categories,
+      duration_min: null,
+    });
+
+    setSaving(false);
+
+    if (error) {
+      console.error("workout insert error:", error.message);
+      return;
+    }
+
     router.push("/workouts");
-  }, [draft, router]);
+  }, [draft, router, user]);
 
   const dismissToast = useCallback(() => setShowToast(false), []);
 
@@ -165,8 +229,10 @@ export default function WorkoutEditPage() {
             <button
               type="button"
               onClick={handleSave}
-              className="rounded-xl bg-inverse px-5 py-2.5 text-sm font-extrabold tracking-wide text-on-inverse transition-all duration-150 active:scale-[0.97]"
+              disabled={saving}
+              className="flex items-center gap-2 rounded-xl bg-inverse px-5 py-2.5 text-sm font-extrabold tracking-wide text-on-inverse transition-all duration-150 active:scale-[0.97] disabled:opacity-60"
             >
+              {saving && <Loader2 size={14} className="animate-spin" />}
               保存
             </button>
           )}
