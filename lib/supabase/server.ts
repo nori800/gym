@@ -1,12 +1,21 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import type { Database } from "@/types/database.types";
+import { resolveSupabasePublicConfig } from "./public-env";
 
 export async function createServerSupabaseClient() {
+  const { url, publishableKey } = resolveSupabasePublicConfig();
+  if (!url || !publishableKey) {
+    throw new Error(
+      "Supabase の環境変数が不足しています。`NEXT_PUBLIC_SUPABASE_URL` と " +
+        "`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` を設定してください。",
+    );
+  }
+
   const cookieStore = await cookies();
   return createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+    url,
+    publishableKey,
     {
       cookies: {
         getAll() {

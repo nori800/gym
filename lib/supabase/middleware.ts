@@ -1,14 +1,15 @@
 import { createServerClient } from "@supabase/ssr";
 import type { User } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
+import { resolveSupabasePublicConfig } from "./public-env";
 
 export async function updateSession(request: NextRequest) {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabasePublishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  const { url: supabaseUrl, publishableKey: supabaseAnonKey } =
+    resolveSupabasePublicConfig();
 
-  if (!supabaseUrl || !supabasePublishableKey) {
+  if (!supabaseUrl || !supabaseAnonKey) {
     console.error(
-      "[middleware] NEXT_PUBLIC_SUPABASE_URL または NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY が未設定です。Vercel の Environment Variables を確認してください。",
+      "[middleware] NEXT_PUBLIC_SUPABASE_URL またはクライアント用キー（NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY、または移行中の NEXT_PUBLIC_SUPABASE_ANON_KEY）が未設定です。`.env.local` / Vercel の Environment Variables を確認し、サーバーを再起動してください。",
     );
     return NextResponse.next({ request });
   }
@@ -17,7 +18,7 @@ export async function updateSession(request: NextRequest) {
 
   const supabase = createServerClient(
     supabaseUrl,
-    supabasePublishableKey,
+    supabaseAnonKey,
     {
       cookies: {
         getAll() {
