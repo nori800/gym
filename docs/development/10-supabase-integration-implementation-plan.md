@@ -24,7 +24,7 @@
 | 変数 | 用途 |
 |------|------|
 | `NEXT_PUBLIC_SUPABASE_URL` | ブラウザ・サーバー共通のプロジェクト URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | クライアント用 anon キー（RLS の下で利用） |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | クライアント用 Publishable キー（従来の anon / RLS の下で利用） |
 | `SUPABASE_SERVICE_ROLE_KEY` | **サーバーのみ**（管理タスク・バッチ用。クライアントに載せない） |
 
 リポジトリには `.env.example` にキー名のみ記載する。
