@@ -1,7 +1,8 @@
-import { Dumbbell, Film, Clock, Weight, Calendar, AlertTriangle } from "lucide-react";
+import { Dumbbell, Film, Clock, Weight, Calendar, AlertTriangle, TimerOff } from "lucide-react";
 
 type SharedData = {
   shared_at: string;
+  expires_at: string;
   video?: {
     id: string;
     title: string;
@@ -9,6 +10,7 @@ type SharedData = {
     shot_date: string;
     duration: number | null;
     memo: string | null;
+    video_url: string | null;
   };
   workout?: {
     id: string;
@@ -23,11 +25,14 @@ type SharedData = {
 async function fetchSharedData(
   token: string,
   origin: string,
-): Promise<{ data?: SharedData; error?: string }> {
+): Promise<{ data?: SharedData; error?: string; expired?: boolean }> {
   try {
     const res = await fetch(`${origin}/api/share?token=${encodeURIComponent(token)}`, {
       cache: "no-store",
     });
+    if (res.status === 410) {
+      return { error: "この共有リンクは期限切れです", expired: true };
+    }
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
       return { error: body.error || "共有リンクが無効です" };
@@ -66,7 +71,21 @@ export default async function SharedLinkPage({
     process.env.NEXT_PUBLIC_SITE_URL ||
     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
 
-  const { data, error } = await fetchSharedData(token, origin);
+  const { data, error, expired } = await fetchSharedData(token, origin);
+
+  if (expired) {
+    return (
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-surface px-6 text-center">
+        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
+          <TimerOff size={28} strokeWidth={1.5} className="text-secondary" />
+        </div>
+        <h1 className="text-lg font-bold text-primary">リンクの期限が切れました</h1>
+        <p className="max-w-sm text-sm leading-relaxed text-secondary">
+          この共有リンクは有効期限が過ぎています。共有元に再度リンクの作成を依頼してください。
+        </p>
+      </div>
+    );
+  }
 
   if (error || !data) {
     return (
@@ -83,6 +102,7 @@ export default async function SharedLinkPage({
   }
 
   const sharedDate = new Date(data.shared_at).toLocaleDateString("ja-JP");
+  const expiresDate = new Date(data.expires_at).toLocaleDateString("ja-JP");
 
   return (
     <div className="min-h-dvh bg-surface">
@@ -96,13 +116,33 @@ export default async function SharedLinkPage({
             共有されたデータ
           </h1>
           <p className="mt-1 text-xs text-secondary">
-            共有日: {sharedDate}
+            共有日: {sharedDate} · 有効期限: {expiresDate}
           </p>
         </div>
 
         {/* Video Section */}
         {data.video && (
           <section className="overflow-hidden rounded-[18px] bg-white shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
+            {/* Video Player */}
+            {data.video.video_url ? (
+              <div className="relative aspect-video w-full bg-black">
+                <video
+                  src={data.video.video_url}
+                  controls
+                  playsInline
+                  preload="metadata"
+                  className="absolute inset-0 h-full w-full object-contain"
+                />
+              </div>
+            ) : (
+              <div className="flex aspect-video w-full items-center justify-center bg-neutral-100">
+                <div className="text-center">
+                  <Film size={32} strokeWidth={1.5} className="mx-auto text-muted" />
+                  <p className="mt-2 text-xs text-secondary">動画を読み込めませんでした</p>
+                </div>
+              </div>
+            )}
+
             <div className="flex items-center gap-3 border-b border-border px-[18px] py-4">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-accent/10">
                 <Film size={18} strokeWidth={1.5} className="text-primary" />

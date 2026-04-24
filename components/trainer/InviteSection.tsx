@@ -1,20 +1,65 @@
 "use client";
 
-import { UserPlus, Loader2 } from "lucide-react";
+import { useState, useCallback } from "react";
+import { UserPlus, Loader2, Search, AlertCircle } from "lucide-react";
+
+type SearchResult = {
+  id: string;
+  user_id: string;
+  display_name: string;
+  email_hint: string | null;
+  has_trainer: boolean;
+  is_self: boolean;
+};
 
 interface InviteSectionProps {
-  inviteEmail: string;
+  inviteQuery: string;
   inviting: boolean;
-  onEmailChange: (value: string) => void;
-  onInvite: () => void;
+  onQueryChange: (value: string) => void;
+  onInvite: (target: SearchResult) => void;
 }
 
 export function InviteSection({
-  inviteEmail,
+  inviteQuery,
   inviting,
-  onEmailChange,
+  onQueryChange,
   onInvite,
 }: InviteSectionProps) {
+  const [results, setResults] = useState<SearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [hasSearched, setHasSearched] = useState(false);
+
+  const handleSearch = useCallback(async () => {
+    const q = inviteQuery.trim();
+    if (q.length < 2) {
+      setSearchError("2文字以上入力してください");
+      return;
+    }
+
+    setSearching(true);
+    setSearchError(null);
+    setResults([]);
+    setHasSearched(true);
+
+    try {
+      const res = await fetch(
+        `/api/trainer/search-member?q=${encodeURIComponent(q)}`,
+      );
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setSearchError(data.error || "検索に失敗しました");
+        return;
+      }
+      const data = await res.json();
+      setResults(data.results ?? []);
+    } catch {
+      setSearchError("検索に失敗しました");
+    } finally {
+      setSearching(false);
+    }
+  }, [inviteQuery]);
+
   return (
     <section className="mt-6">
       <div className="rounded-[18px] bg-white p-[18px] shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
@@ -31,30 +76,84 @@ export function InviteSection({
         </div>
         <div className="mt-3.5 flex gap-2">
           <input
-            type="email"
-            value={inviteEmail}
-            onChange={(e) => onEmailChange(e.target.value)}
-            placeholder="メールアドレスまたは名前"
+            type="text"
+            value={inviteQuery}
+            onChange={(e) => onQueryChange(e.target.value)}
+            placeholder="メールアドレスまたは名前（2文字以上）"
             className="min-h-[44px] flex-1 rounded-xl border border-border bg-surface px-3.5 text-sm outline-none transition-colors focus:border-primary/30 focus:ring-2 focus:ring-primary/10"
             onKeyDown={(e) => {
-              if (e.key === "Enter" && !inviting) onInvite();
+              if (e.key === "Enter" && !searching) handleSearch();
             }}
           />
           <button
             type="button"
-            onClick={onInvite}
-            disabled={inviting || !inviteEmail.trim()}
+            onClick={handleSearch}
+            disabled={searching || inviteQuery.trim().length < 2}
             className="flex min-h-[44px] items-center gap-1.5 rounded-xl bg-inverse px-4 text-sm font-extrabold text-on-inverse transition-all active:scale-[0.98] disabled:opacity-50"
           >
-            {inviting ? (
+            {searching ? (
               <Loader2 size={14} className="animate-spin" />
             ) : (
-              <UserPlus size={14} strokeWidth={2} />
+              <Search size={14} strokeWidth={2} />
             )}
-            招待
+            検索
           </button>
         </div>
+
+        {searchError && (
+          <div className="mt-3 flex items-center gap-2 rounded-lg bg-danger/10 px-3 py-2">
+            <AlertCircle size={14} className="shrink-0 text-danger" />
+            <p className="text-xs text-danger">{searchError}</p>
+          </div>
+        )}
+
+        {hasSearched && results.length === 0 && !searching && !searchError && (
+          <p className="mt-3 text-center text-xs text-secondary">
+            該当するユーザーが見つかりませんでした
+          </p>
+        )}
+
+        {results.length > 0 && (
+          <div className="mt-3 space-y-2">
+            {results.map((r) => (
+              <div
+                key={r.id}
+                className="flex items-center justify-between gap-3 rounded-xl bg-surface px-3 py-2.5"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-bold">{r.display_name}</p>
+                  {r.email_hint && (
+                    <p className="text-xs text-secondary">{r.email_hint}</p>
+                  )}
+                </div>
+                {r.is_self ? (
+                  <span className="shrink-0 text-xs text-secondary">自分</span>
+                ) : r.has_trainer ? (
+                  <span className="shrink-0 text-xs text-secondary">
+                    担当済み
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => onInvite(r)}
+                    disabled={inviting}
+                    className="flex shrink-0 items-center gap-1 rounded-lg bg-inverse px-3 py-1.5 text-xs font-extrabold text-on-inverse transition-all active:scale-[0.98] disabled:opacity-50"
+                  >
+                    {inviting ? (
+                      <Loader2 size={12} className="animate-spin" />
+                    ) : (
+                      <UserPlus size={12} strokeWidth={2} />
+                    )}
+                    招待
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );
 }
+
+export type { SearchResult };

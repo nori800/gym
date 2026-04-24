@@ -11,6 +11,9 @@ import {
   Sparkles,
   Loader2,
   LogIn,
+  Users,
+  Film,
+  Activity,
 } from "lucide-react";
 import { formatJapaneseLongDate } from "@/lib/utils/formatRecordDate";
 import { useAuth } from "@/lib/hooks/useAuth";
@@ -67,6 +70,13 @@ function getSuggestedWorkout(categories: string[]) {
   };
 }
 
+type TrainerSummary = {
+  memberCount: number;
+  recentVideos: number;
+  recentWorkouts: number;
+  members: { user_id: string; display_name: string }[];
+};
+
 const EMPTY_DATA: DashboardData = {
   weekSessions: 0,
   latestWeight: null,
@@ -80,6 +90,9 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [allCategories, setAllCategories] = useState<string[]>([]);
   const [fetchError, setFetchError] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [trainerSummary, setTrainerSummary] = useState<TrainerSummary | null>(null);
+  const [unreadFeedback, setUnreadFeedback] = useState(0);
 
   useEffect(() => {
     if (authLoading) return;
@@ -162,6 +175,97 @@ export default function DashboardPage() {
     }
 
     fetchDashboard();
+
+    async function fetchTrainerData() {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("user_id", user!.id)
+        .single();
+
+      const role = profile?.role ?? "member";
+      if (cancelled) return;
+      setUserRole(role);
+
+      if (role !== "trainer") {
+        const { data: myVideos } = await supabase
+          .from("videos")
+          .select("id")
+          .eq("user_id", user!.id);
+
+        if (myVideos && myVideos.length > 0) {
+          const videoIds = myVideos.map((v) => v.id);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const { count: totalFb } = await (supabase as any)
+            .from("video_feedback")
+            .select("id", { count: "exact", head: true })
+            .in("video_id", videoIds);
+
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const { count: readFb } = await (supabase as any)
+            .from("feedback_read_status")
+            .select("id", { count: "exact", head: true })
+            .eq("user_id", user!.id);
+
+          if (!cancelled) {
+            setUnreadFeedback(Math.max(0, (totalFb ?? 0) - (readFb ?? 0)));
+          }
+        }
+        return;
+      }
+
+      const { data: members } = await supabase
+        .from("profiles")
+        .select("user_id, display_name")
+        .eq("trainer_id", user!.id);
+
+      if (cancelled) return;
+
+      const memberList = members ?? [];
+      const memberIds = memberList.map((m) => m.user_id);
+
+      if (memberIds.length === 0) {
+        setTrainerSummary({
+          memberCount: 0,
+          recentVideos: 0,
+          recentWorkouts: 0,
+          members: [],
+        });
+        return;
+      }
+
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      const since = sevenDaysAgo.toISOString();
+
+      const [videoRes, workoutRes] = await Promise.all([
+        supabase
+          .from("videos")
+          .select("id", { count: "exact", head: true })
+          .in("user_id", memberIds)
+          .gte("created_at", since),
+        supabase
+          .from("workouts")
+          .select("id", { count: "exact", head: true })
+          .in("user_id", memberIds)
+          .gte("created_at", since),
+      ]);
+
+      if (cancelled) return;
+
+      setTrainerSummary({
+        memberCount: memberList.length,
+        recentVideos: videoRes.count ?? 0,
+        recentWorkouts: workoutRes.count ?? 0,
+        members: memberList.map((m) => ({
+          user_id: m.user_id,
+          display_name: m.display_name || "名前未設定",
+        })),
+      });
+    }
+
+    fetchTrainerData();
+
     return () => {
       cancelled = true;
     };
@@ -197,6 +301,102 @@ export default function DashboardPage() {
           <Settings size={20} strokeWidth={1.5} />
         </Link>
       </header>
+
+      {/* Unread feedback badge for members */}
+      {userRole === "member" && unreadFeedback > 0 && (
+        <Link
+          href="/videos"
+          className="flex items-center gap-3 rounded-[18px] bg-accent/10 border border-accent/25 px-[18px] py-3 transition-all active:scale-[0.99]"
+        >
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent/20">
+            <Activity size={16} strokeWidth={2} className="text-primary" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-bold tracking-tight">
+              新しいフィードバックが {unreadFeedback} 件あります
+            </p>
+            <p className="mt-0.5 text-xs text-secondary">
+              トレーナーからのコメントを確認しましょう
+            </p>
+          </div>
+          <ChevronRight size={16} strokeWidth={1.5} className="shrink-0 text-muted" />
+        </Link>
+      )}
+
+      {/* Trainer Summary */}
+      {userRole === "trainer" && trainerSummary && (
+        <section className="space-y-3">
+          <div className="flex items-center gap-1.5 px-0.5">
+            <Users size={12} strokeWidth={2} className="text-accent" />
+            <h2 className="text-xs font-title uppercase tracking-[0.12em] text-muted">
+              トレーナーサマリー
+            </h2>
+          </div>
+          <div className="grid grid-cols-3 gap-2.5">
+            <div className="flex flex-col justify-center rounded-[18px] bg-white p-4 shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
+              <p className="text-xs font-title uppercase tracking-[0.12em] text-muted">メンバー</p>
+              <p className="mt-2 flex items-baseline gap-1">
+                <span className="text-2xl font-metric leading-none">{trainerSummary.memberCount}</span>
+                <span className="text-xs font-caption text-muted">名</span>
+              </p>
+            </div>
+            <div className="flex flex-col justify-center rounded-[18px] bg-white p-4 shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
+              <p className="text-xs font-title uppercase tracking-[0.12em] text-muted">新着動画</p>
+              <p className="mt-2 flex items-baseline gap-1">
+                <span className="text-2xl font-metric leading-none">{trainerSummary.recentVideos}</span>
+                <span className="text-xs font-caption text-muted">本/7日</span>
+              </p>
+            </div>
+            <div className="flex flex-col justify-center rounded-[18px] bg-white p-4 shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
+              <p className="text-xs font-title uppercase tracking-[0.12em] text-muted">WO</p>
+              <p className="mt-2 flex items-baseline gap-1">
+                <span className="text-2xl font-metric leading-none">{trainerSummary.recentWorkouts}</span>
+                <span className="text-xs font-caption text-muted">件/7日</span>
+              </p>
+            </div>
+          </div>
+          {trainerSummary.members.length > 0 && (
+            <div className="space-y-1.5">
+              {trainerSummary.members.slice(0, 5).map((m) => (
+                <Link
+                  key={m.user_id}
+                  href={`/videos?member=${encodeURIComponent(m.user_id)}`}
+                  className="flex items-center gap-3 rounded-[14px] bg-white px-4 py-3 shadow-[0_0_0_1px_rgba(0,0,0,.04)] transition-all active:scale-[0.99]"
+                >
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent/10">
+                    <Users size={14} strokeWidth={1.5} className="text-primary" />
+                  </div>
+                  <span className="flex-1 truncate text-sm font-bold">{m.display_name}</span>
+                  <ChevronRight size={14} strokeWidth={1.5} className="text-muted" />
+                </Link>
+              ))}
+              {trainerSummary.members.length > 5 && (
+                <Link
+                  href="/trainer"
+                  className="block text-center text-xs font-bold text-secondary hover:text-primary"
+                >
+                  すべてのメンバーを見る →
+                </Link>
+              )}
+            </div>
+          )}
+          {trainerSummary.memberCount === 0 && (
+            <Link
+              href="/trainer"
+              className="flex items-center gap-3.5 rounded-[18px] bg-white px-[18px] py-4 shadow-[0_0_0_1px_rgba(0,0,0,.04)] transition-all active:scale-[0.99]"
+            >
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-accent/10">
+                <Users size={18} strokeWidth={1.5} className="text-primary" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold tracking-tight">メンバーを招待</p>
+                <p className="mt-0.5 text-xs text-secondary">トレーナーページからメンバーを追加しましょう</p>
+              </div>
+              <ChevronRight size={16} strokeWidth={1.5} className="shrink-0 text-muted" />
+            </Link>
+          )}
+        </section>
+      )}
 
       {!user ? (
         <section>

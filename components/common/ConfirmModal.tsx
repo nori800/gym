@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef } from "react";
+import { FocusTrap } from "./FocusTrap";
 
 interface ConfirmModalProps {
   open: boolean;
@@ -52,33 +53,35 @@ export function ConfirmModal({
         aria-label={title}
         onKeyDown={handleKeyDown}
       >
-        <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl animate-fade-in">
-          <h3 className="text-base font-bold tracking-tight text-primary">{title}</h3>
-          {description && (
-            <p className="mt-2 text-sm leading-relaxed text-secondary">{description}</p>
-          )}
-          <div className="mt-5 flex gap-2">
-            <button
-              type="button"
-              onClick={onCancel}
-              className="flex flex-1 min-h-[44px] items-center justify-center rounded-xl bg-chip text-sm font-bold text-secondary transition-all active:scale-[0.98]"
-            >
-              {cancelLabel}
-            </button>
-            <button
-              ref={confirmRef}
-              type="button"
-              onClick={onConfirm}
-              className={`flex flex-1 min-h-[44px] items-center justify-center rounded-xl text-sm font-extrabold transition-all active:scale-[0.98] ${
-                danger
-                  ? "bg-danger text-white"
-                  : "bg-inverse text-on-inverse"
-              }`}
-            >
-              {confirmLabel}
-            </button>
+        <FocusTrap>
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl animate-fade-in">
+            <h3 className="text-base font-bold tracking-tight text-primary">{title}</h3>
+            {description && (
+              <p className="mt-2 text-sm leading-relaxed text-secondary">{description}</p>
+            )}
+            <div className="mt-5 flex gap-2">
+              <button
+                type="button"
+                onClick={onCancel}
+                className="flex flex-1 min-h-[44px] items-center justify-center rounded-xl bg-chip text-sm font-bold text-secondary transition-all active:scale-[0.98]"
+              >
+                {cancelLabel}
+              </button>
+              <button
+                ref={confirmRef}
+                type="button"
+                onClick={onConfirm}
+                className={`flex flex-1 min-h-[44px] items-center justify-center rounded-xl text-sm font-extrabold transition-all active:scale-[0.98] ${
+                  danger
+                    ? "bg-danger text-white"
+                    : "bg-inverse text-on-inverse"
+                }`}
+              >
+                {confirmLabel}
+              </button>
+            </div>
           </div>
-        </div>
+        </FocusTrap>
       </div>
     </>
   );

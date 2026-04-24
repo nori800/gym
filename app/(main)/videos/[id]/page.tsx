@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -24,6 +24,7 @@ import { WorkoutLinkPanel } from "@/components/video-detail/WorkoutLinkPanel";
 import { AngleTool, type AngleMeasurement } from "@/components/player/AngleTool";
 import { CustomGuides, type Guide } from "@/components/player/CustomGuides";
 import { ShareLinkButton } from "@/components/video-detail/ShareLinkButton";
+import { FeedbackPanel } from "@/components/video-detail/FeedbackPanel";
 
 type Panel = "overlay" | "draw" | "angle" | "guides" | null;
 
@@ -41,6 +42,22 @@ export default function VideoDetailPage() {
   const [panel, setPanel] = useState<Panel>(null);
   const [memoOpen, setMemoOpen] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    void (async () => {
+      const { createClient } = await import("@/lib/supabase/client");
+      const sb = createClient();
+      const { data: profile } = await sb
+        .from("profiles")
+        .select("role")
+        .eq("user_id", user.id)
+        .single();
+      setUserRole(profile?.role ?? "member");
+    })();
+  }, [user]);
 
   const [angleMeasurements, setAngleMeasurements] = useState<AngleMeasurement[]>([]);
   const [customGuides, setCustomGuides] = useState<Guide[]>([]);
@@ -270,6 +287,16 @@ export default function VideoDetailPage() {
             <Link2 size={13} strokeWidth={1.5} />
             紐付け
           </button>
+          <button
+            type="button"
+            onClick={() => setFeedbackOpen(!feedbackOpen)}
+            className={`flex min-h-[44px] items-center gap-1 rounded-md px-3 py-1.5 text-xs transition-colors ${
+              feedbackOpen ? "bg-surface text-primary" : "text-muted"
+            }`}
+          >
+            <Share2 size={13} strokeWidth={1.5} />
+            FB
+          </button>
         </div>
 
         {panel === "overlay" && (
@@ -356,6 +383,14 @@ export default function VideoDetailPage() {
             saving={detail.memoSaving}
             onMemoChange={detail.setMemo}
             onSave={detail.handleMemoSave}
+          />
+        )}
+
+        {feedbackOpen && video && (
+          <FeedbackPanel
+            videoId={video.id}
+            isTrainer={userRole === "trainer"}
+            currentTime={playback.currentTime}
           />
         )}
 

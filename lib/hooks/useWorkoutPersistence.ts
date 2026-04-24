@@ -91,7 +91,11 @@ export function useWorkoutPersistence(
 
     let error;
     if (editId) {
-      ({ error } = await supabase.from("workouts").update(payload).eq("id", editId));
+      ({ error } = await supabase
+        .from("workouts")
+        .update(payload)
+        .eq("id", editId)
+        .eq("user_id", userId));
     } else {
       ({ error } = await supabase.from("workouts").insert(payload));
     }
@@ -99,6 +103,7 @@ export function useWorkoutPersistence(
     setSaving(false);
 
     if (error) {
+      console.error("[useWorkoutPersistence] save error:", error.message);
       showToast("保存に失敗しました: " + error.message, "error");
       return;
     }

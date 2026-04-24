@@ -119,8 +119,11 @@
 | 設定・プロフィール | `profiles` | `user_id` = `auth.uid()` |
 | 動画一覧・詳細 | `videos`, `video_annotations` | Storage とパス一致 |
 | 撮影メタ | `videos` | `sessionStorage` 依存を廃止し、`video_id` で遷移 |
-| ワークアウト履歴・編集 | 要設計（3.1） | 現行モックを置換 |
-| ボディ | `body_logs`（新規想定） | 日付は既存 `DatePickerField` の ISO |
+| ワークアウト履歴・編集 | `workouts`, `workout_templates` | JSONB 方式で実装済み |
+| ボディ | `body_logs` | 日付は既存 `DatePickerField` の ISO |
+| 共有リンク | `shared_links` | トークンベース、7 日期限、signed URL で動画再生 |
+| フィードバック | `video_feedback`, `feedback_read_status` | トレーナー→会員、RLS で権限分離 |
+| トレーナー招待 | `profiles.trainer_id` | メール検索は API Route + service role（[ADR](../architecture/adr-email-search-for-invitation.md)） |
 
 ---
 
@@ -139,6 +142,29 @@
 - [ ] 上記フェーズ S1〜S5 のチェックボックスが、ステージング環境で満たされている
 - [ ] [09-implementation-plan.md](09-implementation-plan.md) の「Supabase 連携フェーズ」記述と矛盾がないよう相互リンク・更新済み
 - [ ] ADR に「ワークアウト永続化のスキーマ案（3.1）」が記録されている
+
+---
+
+## 8. 2026-04 以降のプロダクト・ロードマップ（参照）
+
+Supabase 連携の **フェーズ S0〜S6**（上記 §4〜§6）は **スキーマ・Storage・RLS の実装手順**として継続利用する。  
+**プロダクト優先度・トレーナー価値・共有動画・マンツー前提のオペレーション**は、次の **実装計画書 v2** に集約した（本書と矛盾する場合は、ロードマップ側の Phase を優先して本書 §4〜§6 のチェックリストを更新すること）。
+
+| 文書 | 内容 |
+|------|------|
+| [reviews/planning/2026-04-25-04-engineering-implementation-plan.md](../reviews/planning/2026-04-25-04-engineering-implementation-plan.md) | Phase 0〜4、エピック E0〜E7、BL 対応、受け入れ条件 |
+| [reviews/planning/2026-04-25-02-pm-residual-issues-backlog.md](../reviews/planning/2026-04-25-02-pm-residual-issues-backlog.md) | バックログ ID（BL-P*）一覧 |
+| [reviews/planning/2026-04-25-flow-trainer-to-member-onboarding.md](../reviews/planning/2026-04-25-flow-trainer-to-member-onboarding.md) | オーナー／トレーナー／会員のオンボーディング分担 |
+
+**対応表（概要）**
+
+| 本書（10） | ロードマップ（04） |
+|------------|-------------------|
+| S1 認証・プロフィール | 基盤完了想定。E0 招待で `profiles` 操作が増える場合のみ追記 |
+| S2 動画・Storage | E1 共有動画と直結。signed URL 方針は E1-T1 で確定 |
+| S3 アノテ | E6 に含まれる UI 整理と並走可能 |
+| S4〜S5 ワークアウト・ボディ | E5 God 分割時にリファクタ余地 |
+| S6 品質 | E4 / E5 と統合 |
 
 ---
 

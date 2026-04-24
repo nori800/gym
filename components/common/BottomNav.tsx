@@ -25,7 +25,7 @@ const NAV_RIGHT_DEFAULT = [
 
 const NAV_RIGHT_TRAINER = [
   { href: "/videos", label: "動画", icon: Film, match: ["/videos"] },
-  { href: "/trainer", label: "トレーナー", icon: Users, match: ["/trainer"] },
+  { href: "/trainer", label: "管理", icon: Users, match: ["/trainer", "/body"] },
 ] as const;
 
 function isPathActive(pathname: string, match: readonly string[]) {
@@ -91,20 +91,26 @@ export function BottomNav({ userRole }: { userRole?: string }) {
     let cancelled = false;
     const supabase = createClient();
 
-    supabase.auth.getUser().then(({ data }) => {
-      if (cancelled || !data.user) return;
-      supabase
-        .from("profiles")
-        .select("role")
-        .eq("user_id", data.user.id)
-        .single()
-        .then(({ data: profile, error }) => {
-          if (error) {
-            console.error("[BottomNav] profile fetch error:", error.message);
-          }
-          if (!cancelled) setResolvedRole(profile?.role ?? null);
-        });
-    });
+    supabase.auth
+      .getUser()
+      .then(({ data }) => {
+        if (cancelled || !data.user) return;
+        supabase
+          .from("profiles")
+          .select("role")
+          .eq("user_id", data.user.id)
+          .single()
+          .then(({ data: profile, error }) => {
+            if (error) {
+              console.error("[BottomNav] profile fetch error:", error.message);
+            }
+            if (!cancelled) setResolvedRole(profile?.role ?? null);
+          });
+      })
+      .catch((err) => {
+        console.error("[BottomNav] auth.getUser error:", err);
+        if (!cancelled) setResolvedRole(null);
+      });
 
     return () => {
       cancelled = true;

@@ -7,7 +7,7 @@ import { useAuth } from "@/lib/hooks/useAuth";
 import { useToast } from "@/lib/hooks/useToast";
 import { AppToast } from "@/components/common/AppToast";
 import { createClient } from "@/lib/supabase/client";
-import { InviteSection } from "@/components/trainer/InviteSection";
+import { InviteSection, type SearchResult } from "@/components/trainer/InviteSection";
 import { MemberCard, type MemberProfile, type MemberDetail } from "@/components/trainer/MemberCard";
 
 export default function TrainerPage() {
@@ -169,38 +169,19 @@ export default function TrainerPage() {
     [expandedMember, fetchMemberDetail],
   );
 
-  const handleInvite = useCallback(async () => {
-    if (!user || !inviteEmail.trim()) return;
+  const handleInvite = useCallback(async (target: SearchResult) => {
+    if (!user) return;
     setInviting(true);
     const supabase = createClient();
 
-    const { data: targetUser } = await supabase
-      .from("profiles")
-      .select("id, user_id, trainer_id, display_name")
-      .ilike("display_name", inviteEmail.trim())
-      .limit(1);
-
-    if (!targetUser || targetUser.length === 0) {
-      show("ユーザーが見つかりません", "error");
-      setInviting(false);
-      return;
-    }
-
-    const target = targetUser[0];
-    if (!target) {
-      show("ユーザーが見つかりません", "error");
-      setInviting(false);
-      return;
-    }
-
-    if (target.trainer_id) {
-      show("このユーザーは既に別のトレーナーに紐づいています", "error");
-      setInviting(false);
-      return;
-    }
-
-    if (target.user_id === user.id) {
+    if (target.is_self) {
       show("自分自身を招待することはできません", "error");
+      setInviting(false);
+      return;
+    }
+
+    if (target.has_trainer) {
+      show("このユーザーは既に別のトレーナーに紐づいています", "error");
       setInviting(false);
       return;
     }
@@ -218,7 +199,7 @@ export default function TrainerPage() {
       fetchMembers();
     }
     setInviting(false);
-  }, [user, inviteEmail, show, fetchMembers]);
+  }, [user, show, fetchMembers]);
 
   const handleRemove = useCallback(
     async (member: MemberProfile) => {
@@ -272,9 +253,9 @@ export default function TrainerPage() {
       </header>
 
       <InviteSection
-        inviteEmail={inviteEmail}
+        inviteQuery={inviteEmail}
         inviting={inviting}
-        onEmailChange={setInviteEmail}
+        onQueryChange={setInviteEmail}
         onInvite={handleInvite}
       />
 
