@@ -18,15 +18,20 @@ export function formatJapaneseLongDate(iso: string): string {
   return `${y}年${m}月${day}日（${w}）`;
 }
 
+function currentIso(): string {
+  const n = new Date();
+  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
+}
+
 /** 相対表現（ホーム・カードのサブ行用） */
-export function formatRelativeCalendarDay(iso: string, todayIso = "2026-04-21"): string {
+export function formatRelativeCalendarDay(iso: string, todayIso?: string): string {
   const d = parseIsoDate(iso);
-  const t = parseIsoDate(todayIso);
+  const t = parseIsoDate(todayIso ?? currentIso());
   const diffMs = t.getTime() - d.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
   if (diffDays === 0) return "今日";
   if (diffDays === 1) return "昨日";
   if (diffDays > 1 && diffDays < 7) return `${diffDays}日前`;
-  if (diffDays < 0) return "未来の日付";
+  if (diffDays < 0) return `${Math.abs(diffDays)}日後`;
   return `${d.getMonth() + 1}/${d.getDate()}`;
 }

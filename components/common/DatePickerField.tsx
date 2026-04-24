@@ -107,12 +107,15 @@ export function DatePickerField({ value, onChange, "aria-label": ariaLabel = "æ—
     });
   }, []);
 
+  const today = todayIso();
+
   const pick = useCallback(
     (iso: string) => {
+      if (iso > today) return;
       onChange(iso);
       setOpen(false);
     },
-    [onChange],
+    [onChange, today],
   );
 
   const pickToday = useCallback(() => {
@@ -221,25 +224,29 @@ export function DatePickerField({ value, onChange, "aria-label": ariaLabel = "æ—
                   ))}
                   {cells.map((c, i) => {
                     const selected = c.iso === value;
+                    const isFuture = c.iso > today;
                     const tone = dayToneFromIso(c.iso);
                     const holName = japaneseHolidayName(c.iso);
-                    const toneClass = selected ? "text-on-inverse" : dayNumberTextClass(tone, c.inCurrentMonth);
+                    const toneClass = selected ? "text-on-inverse" : isFuture ? "text-muted/30" : dayNumberTextClass(tone, c.inCurrentMonth);
                     return (
                       <button
                         key={`${c.iso}-${i}`}
                         type="button"
                         onClick={() => pick(c.iso)}
+                        disabled={isFuture}
                         aria-label={
                           holName
                             ? `${c.day}æ—¥ã€${holName}`
                             : `${c.day}æ—¥`
                         }
-                        className={`mx-auto flex h-10 w-10 items-center justify-center rounded-full text-sm font-metric transition-all duration-150 active:scale-95 ${
-                          selected
-                            ? `bg-inverse font-bold shadow-[0_2px_8px_rgba(0,0,0,0.12)] ${toneClass}`
-                            : `${toneClass} ${
-                                c.inCurrentMonth ? "hover:bg-chip" : "hover:bg-chip/60"
-                              }`
+                        className={`mx-auto flex h-10 w-10 items-center justify-center rounded-full text-sm font-metric transition-all duration-150 ${
+                          isFuture
+                            ? `cursor-not-allowed ${toneClass}`
+                            : selected
+                              ? `bg-inverse font-bold shadow-[0_2px_8px_rgba(0,0,0,0.12)] ${toneClass} active:scale-95`
+                              : `${toneClass} ${
+                                  c.inCurrentMonth ? "hover:bg-chip" : "hover:bg-chip/60"
+                                } active:scale-95`
                         }`}
                       >
                         {c.day}

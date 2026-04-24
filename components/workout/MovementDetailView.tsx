@@ -439,32 +439,28 @@ export function MovementDetailView({
         <p className="mt-3 px-1 text-xs text-muted">
           数字をタップで直接入力、± で細かく調整できます
         </p>
-      </div>
 
-      {/* Fixed CTA */}
-      <div className="shrink-0 space-y-2 px-[22px] pb-[max(1.5rem,calc(0.75rem+env(safe-area-inset-bottom,0px)))] pt-3">
-        {onAddAndSave && (
+        {/* CTA */}
+        <div className="mt-6 space-y-2 pb-2">
+          {onAddAndSave && (
+            <button
+              type="button"
+              onClick={onAddAndSave}
+              disabled={saving}
+              className="flex h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-inverse text-sm font-extrabold tracking-wide text-on-inverse transition-all duration-200 active:scale-[0.98] disabled:opacity-60"
+            >
+              {saving && <Loader2 size={14} className="animate-spin" />}
+              保存
+            </button>
+          )}
           <button
             type="button"
-            onClick={onAddAndSave}
-            disabled={saving}
-            className="flex h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-inverse text-base font-extrabold tracking-wide text-on-inverse shadow-[0_4px_16px_rgba(0,0,0,0.12)] transition-all duration-200 active:scale-[0.98] active:shadow-[0_2px_8px_rgba(0,0,0,0.1)] disabled:opacity-60"
+            onClick={onAdd}
+            className="flex h-[44px] w-full items-center justify-center rounded-xl text-sm font-bold text-secondary transition-all duration-200 active:scale-[0.98] active:bg-chip"
           >
-            {saving && <Loader2 size={16} className="animate-spin" />}
-            追加して保存
+            追加だけ
           </button>
-        )}
-        <button
-          type="button"
-          onClick={onAdd}
-          className={`flex h-[52px] w-full items-center justify-center rounded-xl text-base font-extrabold tracking-wide transition-all duration-200 active:scale-[0.98] ${
-            onAddAndSave
-              ? "border border-border bg-white text-primary shadow-[0_0_0_1px_rgba(0,0,0,.04)]"
-              : "bg-inverse text-on-inverse shadow-[0_4px_16px_rgba(0,0,0,0.12)] active:shadow-[0_2px_8px_rgba(0,0,0,0.1)]"
-          }`}
-        >
-          追加だけ（あとで保存）
-        </button>
+        </div>
       </div>
     </div>
   );

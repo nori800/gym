@@ -7,6 +7,7 @@ import { PenSquare, Dumbbell, Video, X, Camera, Loader2, Trash2, Pencil, LogIn }
 import { RecordDateBlock } from "@/components/common/RecordDateBlock";
 import { FocusTrap } from "@/components/common/FocusTrap";
 import { AppToast } from "@/components/common/AppToast";
+import { ConfirmModal } from "@/components/common/ConfirmModal";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useToast } from "@/lib/hooks/useToast";
 import { createClient } from "@/lib/supabase/client";
@@ -116,23 +117,30 @@ export default function WorkoutsPage() {
     setVideoCounts(counts);
   }, []);
 
-  const handleDelete = useCallback(async (entryId: string) => {
-    if (!user) return;
-    const ok = window.confirm("このワークアウトを削除しますか？この操作は取り消せません。");
-    if (!ok) return;
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+
+  const confirmDelete = useCallback(async () => {
+    if (!user || !deleteTargetId) return;
 
     const supabase = createClient();
-    const { error } = await supabase.from("workouts").delete().eq("id", entryId);
+    const { error } = await supabase.from("workouts").delete().eq("id", deleteTargetId);
 
     if (error) {
       showToast("削除に失敗しました", "error");
+      setDeleteTargetId(null);
       return;
     }
 
-    setHistory((prev) => prev.filter((e) => e.id !== entryId));
+    setHistory((prev) => prev.filter((e) => e.id !== deleteTargetId));
     setDetailEntry(null);
+    setDeleteTargetId(null);
     showToast("ワークアウトを削除しました", "success");
-  }, [user, showToast]);
+  }, [user, deleteTargetId, showToast]);
+
+  const handleDelete = useCallback((entryId: string) => {
+    if (!user) return;
+    setDeleteTargetId(entryId);
+  }, [user]);
 
   if (loading || authLoading) {
     return (
@@ -191,6 +199,15 @@ export default function WorkoutsPage() {
       )}
 
       <AppToast toast={toast} onDismiss={dismissToast} />
+      <ConfirmModal
+        open={!!deleteTargetId}
+        title="ワークアウトを削除"
+        description="この操作は取り消せません。"
+        confirmLabel="削除"
+        danger
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTargetId(null)}
+      />
     </div>
   );
 }

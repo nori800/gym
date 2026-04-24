@@ -3,6 +3,7 @@
 import { Suspense, useState, useCallback, useRef, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { X, Pencil, HelpCircle, Camera, Loader2, BookmarkPlus, BookOpen } from "lucide-react";
+import { ConfirmModal } from "@/components/common/ConfirmModal";
 import Link from "next/link";
 import { DatePickerField } from "@/components/common/DatePickerField";
 import { AppToast } from "@/components/common/AppToast";
@@ -266,10 +267,12 @@ function WorkoutEditInner() {
     }));
   }, []);
 
+  const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
+
   const handleClose = useCallback(() => {
     if (hasAddedMovement) {
-      const ok = window.confirm("編集中の内容が破棄されます。よろしいですか？");
-      if (!ok) return;
+      setDiscardConfirmOpen(true);
+      return;
     }
     router.push("/workouts");
   }, [router, hasAddedMovement]);
@@ -695,6 +698,15 @@ function WorkoutEditInner() {
       <BlockExplainerModal
         open={blockExplainerOpen}
         onClose={() => setBlockExplainerOpen(false)}
+      />
+      <ConfirmModal
+        open={discardConfirmOpen}
+        title="編集内容を破棄"
+        description="入力した内容が失われます。よろしいですか？"
+        confirmLabel="破棄する"
+        danger
+        onConfirm={() => { setDiscardConfirmOpen(false); router.push("/workouts"); }}
+        onCancel={() => setDiscardConfirmOpen(false)}
       />
     </div>
   );

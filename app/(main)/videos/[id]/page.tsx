@@ -11,6 +11,7 @@ import {
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useToast } from "@/lib/hooks/useToast";
 import { AppToast } from "@/components/common/AppToast";
+import { ConfirmModal } from "@/components/common/ConfirmModal";
 import { createClient } from "@/lib/supabase/client";
 import type { Video } from "@/types";
 import type { Json } from "@/types/database.types";
@@ -300,11 +301,11 @@ export default function VideoDetailPage() {
     annotationId, showToast,
   ]);
 
-  // ── Video delete ──────────────────────────────────────────────
-  const handleDelete = useCallback(async () => {
-    if (!user || !video) return;
-    if (!window.confirm("この動画を削除しますか？この操作は取り消せません。")) return;
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
+  const executeDelete = useCallback(async () => {
+    if (!user || !video) return;
+    setDeleteConfirmOpen(false);
     setDeleting(true);
     const supabase = createClient();
 
@@ -344,6 +345,10 @@ export default function VideoDetailPage() {
     showToast("動画を削除しました", "success");
     router.replace("/videos");
   }, [user, video, showToast, router]);
+
+  const handleDelete = useCallback(() => {
+    setDeleteConfirmOpen(true);
+  }, []);
 
   // ── Playback ──────────────────────────────────────────────────
   const togglePlay = useCallback(async () => {
@@ -484,6 +489,15 @@ export default function VideoDetailPage() {
   return (
     <div className="fixed inset-0 z-[60] flex flex-col">
       <AppToast toast={toast} onDismiss={dismissToast} />
+      <ConfirmModal
+        open={deleteConfirmOpen}
+        title="動画を削除"
+        description="この操作は取り消せません。"
+        confirmLabel="削除"
+        danger
+        onConfirm={executeDelete}
+        onCancel={() => setDeleteConfirmOpen(false)}
+      />
 
       {/* Header */}
       <div className="shrink-0 bg-black px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top,0px))]">
