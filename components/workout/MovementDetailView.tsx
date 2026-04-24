@@ -111,11 +111,25 @@ export function MovementDetailView({
           </div>
 
           {/* Segment tabs */}
-          <div className="flex border-b border-border" role="tablist" aria-label="種目情報">
+          <div
+            className="flex border-b border-border"
+            role="tablist"
+            aria-label="種目情報"
+            onKeyDown={(e) => {
+              if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+                e.preventDefault();
+                const next = segment === "overview" ? "muscles" : "overview";
+                setSegment(next);
+                const nextId = next === "overview" ? "tab-overview" : "tab-muscles";
+                document.getElementById(nextId)?.focus();
+              }
+            }}
+          >
             <button
               type="button"
               role="tab"
               id="tab-overview"
+              tabIndex={segment === "overview" ? 0 : -1}
               aria-selected={segment === "overview"}
               aria-controls="tabpanel-overview"
               onClick={() => setSegment("overview")}
@@ -131,6 +145,7 @@ export function MovementDetailView({
               type="button"
               role="tab"
               id="tab-muscles"
+              tabIndex={segment === "muscles" ? 0 : -1}
               aria-selected={segment === "muscles"}
               aria-controls="tabpanel-muscles"
               onClick={() => setSegment("muscles")}

@@ -117,11 +117,17 @@ export function useVideoDetail(
 
     const supabase = createClient();
     (async () => {
-      const { data } = await supabase
+      const { data, error: fetchErr } = await supabase
         .from("videos")
         .select("*")
         .eq("id", id)
         .single();
+
+      if (fetchErr) {
+        console.error("[useVideoDetail] fetch error:", fetchErr.message);
+        setDataLoading(false);
+        return;
+      }
 
       if (!data) {
         setDataLoading(false);

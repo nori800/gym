@@ -124,7 +124,26 @@ export function CustomGuides({
               className="pointer-events-auto cursor-grab active:cursor-grabbing"
               style={{ pointerEvents: "auto" }}
               strokeLinecap="round"
+              tabIndex={0}
+              role="slider"
+              aria-label={`${isH ? "水平" : "垂直"}ガイド ${Math.round(guide.position)}%`}
+              aria-valuenow={Math.round(guide.position)}
+              aria-valuemin={0}
+              aria-valuemax={100}
               onPointerDown={(e) => handlePointerDown(e, guide.id)}
+              onKeyDown={(e) => {
+                const step = e.shiftKey ? 5 : 1;
+                if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
+                  e.preventDefault();
+                  onUpdate(guides.map((g) => g.id === guide.id ? { ...g, position: Math.max(0, g.position - step) } : g));
+                } else if (e.key === "ArrowDown" || e.key === "ArrowRight") {
+                  e.preventDefault();
+                  onUpdate(guides.map((g) => g.id === guide.id ? { ...g, position: Math.min(100, g.position + step) } : g));
+                } else if (e.key === "Delete" || e.key === "Backspace") {
+                  e.preventDefault();
+                  onUpdate(guides.filter((g) => g.id !== guide.id));
+                }
+              }}
             />
           );
         })}

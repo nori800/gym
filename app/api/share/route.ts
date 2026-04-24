@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import crypto from "crypto";
 
 export async function POST(request: NextRequest) {
@@ -23,6 +24,36 @@ export async function POST(request: NextRequest) {
       { error: "video_id または workout_id が必要です" },
       { status: 400 },
     );
+  }
+
+  // Verify ownership: video/workout must belong to the current user
+  if (video_id) {
+    const { data: v } = await supabase
+      .from("videos")
+      .select("id")
+      .eq("id", video_id)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (!v) {
+      return NextResponse.json(
+        { error: "指定された動画が見つかりません" },
+        { status: 403 },
+      );
+    }
+  }
+  if (workout_id) {
+    const { data: w } = await supabase
+      .from("workouts")
+      .select("id")
+      .eq("id", workout_id)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (!w) {
+      return NextResponse.json(
+        { error: "指定されたワークアウトが見つかりません" },
+        { status: 403 },
+      );
+    }
   }
 
   const token = crypto.randomBytes(32).toString("hex");
@@ -88,10 +119,13 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  // Use admin client (service role) to fetch the shared resources,
+  // since the viewer may be unauthenticated and RLS would block access.
+  const admin = createAdminClient();
   const result: Record<string, unknown> = { shared_at: link.created_at };
 
   if (link.video_id) {
-    const { data: video } = await supabase
+    const { data: video } = await admin
       .from("videos")
       .select("id, title, exercise_type, shot_date, duration, memo")
       .eq("id", link.video_id)
@@ -100,7 +134,7 @@ export async function GET(request: NextRequest) {
   }
 
   if (link.workout_id) {
-    const { data: workout } = await supabase
+    const { data: workout } = await admin
       .from("workouts")
       .select("id, title, workout_date, blocks_json, total_sets, total_volume")
       .eq("id", link.workout_id)

@@ -236,12 +236,25 @@ function CompareContent() {
     a.playbackRate = speed;
     b.playbackRate = speed;
 
-    const waitCanPlay = (el: HTMLVideoElement) =>
+    const waitCanPlay = (el: HTMLVideoElement, timeoutMs = 8000) =>
       el.readyState >= 3
         ? Promise.resolve()
         : new Promise<void>((resolve) => {
-            const handler = () => { el.removeEventListener("canplay", handler); resolve(); };
+            let settled = false;
+            const handler = () => {
+              if (settled) return;
+              settled = true;
+              el.removeEventListener("canplay", handler);
+              resolve();
+            };
             el.addEventListener("canplay", handler);
+            setTimeout(() => {
+              if (!settled) {
+                settled = true;
+                el.removeEventListener("canplay", handler);
+                resolve();
+              }
+            }, timeoutMs);
           });
 
     try {

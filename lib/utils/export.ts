@@ -84,8 +84,17 @@ function escapeHTML(str: string): string {
     .replace(/'/g, "&#39;");
 }
 
+function sanitizeHTMLContent(html: string): string {
+  return html
+    .replace(/<script[\s>][\s\S]*?<\/script>/gi, "")
+    .replace(/\bon\w+\s*=\s*["'][^"']*["']/gi, "")
+    .replace(/\bon\w+\s*=\s*[^\s>]+/gi, "")
+    .replace(/javascript\s*:/gi, "blocked:");
+}
+
 export function generatePDFHTML(title: string, content: string): string {
   const safeTitle = escapeHTML(title);
+  const safeContent = sanitizeHTMLContent(content);
   return `<!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -136,7 +145,7 @@ export function generatePDFHTML(title: string, content: string): string {
 <body>
 <h1>${safeTitle}</h1>
 <p class="meta">出力日: ${new Date().toLocaleDateString("ja-JP")}</p>
-${content}
+${safeContent}
 </body>
 </html>`;
 }

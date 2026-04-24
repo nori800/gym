@@ -178,7 +178,7 @@ export function RestTimer({ defaultSeconds = 90, onComplete }: RestTimerProps) {
           <button
             type="button"
             onClick={() => setCompact(true)}
-            className="flex h-7 w-7 items-center justify-center rounded-full text-muted transition-colors active:bg-surface"
+            className="flex h-11 w-11 items-center justify-center rounded-full text-muted transition-colors active:bg-surface"
             aria-label="タイマーを最小化"
           >
             <Minimize2 size={14} strokeWidth={1.5} />

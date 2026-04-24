@@ -15,8 +15,10 @@ import { MovementListView } from "@/components/workout/MovementListView";
 import { MovementDetailView } from "@/components/workout/MovementDetailView";
 import { Toast } from "@/components/workout/Toast";
 import { BlockExplainerModal } from "@/components/workout/BlockExplainerModal";
+import { TemplatePickerSheet } from "@/components/workout/TemplatePickerSheet";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useToast } from "@/lib/hooks/useToast";
+import { useWorkoutPersistence } from "@/lib/hooks/useWorkoutPersistence";
 import { createClient } from "@/lib/supabase/client";
 import type { Json } from "@/types/database.types";
 
@@ -26,13 +28,6 @@ type View =
   | { screen: "detail"; movementId: string };
 
 type TransitionDir = "forward" | "back" | "none";
-
-type TemplateRow = {
-  id: string;
-  title: string;
-  blocks_json: Json;
-  categories: string[];
-};
 
 function blocksJsonToDraft(blocksJson: Json): Block[] {
   const arr = Array.isArray(blocksJson) ? blocksJson : [];
@@ -64,13 +59,7 @@ function WorkoutEditInner() {
 
   const { user } = useAuth();
   const { toast, show: showToast, dismiss: dismissToast } = useToast();
-  const [saving, setSaving] = useState(false);
   const [loadingExisting, setLoadingExisting] = useState(!!editId);
-  const [savingTemplate, setSavingTemplate] = useState(false);
-  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
-  const [templates, setTemplates] = useState<TemplateRow[]>([]);
-  const [loadingTemplates, setLoadingTemplates] = useState(false);
-  const transitionRef = useRef<TransitionDir>("none");
 
   const [draft, setDraft] = useState<WorkoutDraft>(() => {
     const d = new Date();
@@ -83,6 +72,10 @@ function WorkoutEditInner() {
     };
   });
 
+  const persistence = useWorkoutPersistence(draft, editId, user?.id, showToast);
+
+  // ── Navigation state ──
+  const transitionRef = useRef<TransitionDir>("none");
   const [view, setView] = useState<View>({ screen: "editor" });
   const [activeBlockIndex, setActiveBlockIndex] = useState(0);
   const [selectedMovementId, setSelectedMovementId] = useState<string | null>(null);
@@ -91,7 +84,9 @@ function WorkoutEditInner() {
   const [hasAddedMovement, setHasAddedMovement] = useState(false);
   const [transitionKey, setTransitionKey] = useState(0);
   const [blockExplainerOpen, setBlockExplainerOpen] = useState(false);
+  const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
 
+  // ── Load existing workout ──
   useEffect(() => {
     if (!editId) return;
     const supabase = createClient();
@@ -120,6 +115,7 @@ function WorkoutEditInner() {
       });
   }, [editId, showToast]);
 
+  // ── Screen navigation helpers ──
   const navigate = useCallback((next: View, dir: TransitionDir) => {
     transitionRef.current = dir;
     setTransitionKey((k) => k + 1);
@@ -133,6 +129,7 @@ function WorkoutEditInner() {
         ? "animate-slide-back"
         : "animate-fade-in";
 
+  // ── Movement handlers ──
   const handleAddMove = useCallback(
     (blockIndex: number) => {
       setActiveBlockIndex(blockIndex);
@@ -194,71 +191,11 @@ function WorkoutEditInner() {
       return;
     }
 
-    setSaving(true);
-    const supabase = createClient();
-
-    const allMovements = updatedBlocks.flatMap((b) => b.movements);
-    const totalSets = allMovements.reduce((s, m) => s + m.sets, 0);
-    const totalVolume = allMovements.reduce((s, m) => {
-      const avgWeight = m.perSetWeight.length > 0
-        ? m.perSetWeight.reduce((a, w) => a + w, 0) / m.perSetWeight.length
-        : 0;
-      return s + avgWeight * m.reps * m.sets;
-    }, 0);
-    const categories = [...new Set(
-      allMovements
-        .map((m) => getMovementById(m.movementId)?.categoryJa)
-        .filter((c): c is string => !!c),
-    )];
-    const blocksJson = updatedBlocks.map((b) => ({
-      name: b.name,
-      movements: b.movements.map((m) => {
-        const mv = getMovementById(m.movementId);
-        return {
-          movementId: m.movementId,
-          nameJa: mv?.nameJa ?? "",
-          categoryJa: mv?.categoryJa ?? "",
-          sets: m.sets,
-          reps: m.reps,
-          weight: m.perSetWeight[0] ?? 0,
-          perSetWeight: m.perSetWeight,
-          perSetReps: m.perSetReps,
-          weightMode: m.weightMode,
-          assistance: m.assistanceType,
-        };
-      }),
-    }));
-
-    const payload = {
-      user_id: user.id,
-      title: draft.title,
-      workout_date: draft.date,
-      description: draft.description,
-      blocks_json: blocksJson as Json,
-      total_sets: totalSets,
-      total_volume: totalVolume,
-      categories,
-      duration_min: null,
-    };
-
-    let error;
-    if (editId) {
-      ({ error } = await supabase.from("workouts").update(payload).eq("id", editId));
-    } else {
-      ({ error } = await supabase.from("workouts").insert(payload));
-    }
-
-    setSaving(false);
-
-    if (error) {
-      showToast("保存に失敗しました: " + error.message, "error");
-      navigate({ screen: "editor" }, "back");
-      return;
-    }
-
-    showToast(editId ? "ワークアウトを更新しました" : "ワークアウトを保存しました", "success");
-    setTimeout(() => router.push("/workouts"), 600);
-  }, [currentConfig, activeBlockIndex, draft, user, editId, router, navigate, showToast]);
+    // Delegate save to persistence hook via handleSave
+    // (draft state is updated above, so next render will use it)
+    navigate({ screen: "editor" }, "back");
+    await persistence.handleSave();
+  }, [currentConfig, activeBlockIndex, draft, user, navigate, showToast, persistence]);
 
   const handleAddBlock = useCallback(() => {
     setDraft((prev) => ({
@@ -266,8 +203,6 @@ function WorkoutEditInner() {
       blocks: [...prev.blocks, createEmptyBlock(prev.blocks.length)],
     }));
   }, []);
-
-  const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
 
   const handleClose = useCallback(() => {
     if (hasAddedMovement) {
@@ -277,192 +212,24 @@ function WorkoutEditInner() {
     router.push("/workouts");
   }, [router, hasAddedMovement]);
 
-  const buildPayload = useCallback(() => {
-    const allMovements = draft.blocks.flatMap((b) => b.movements);
-    const totalSets = allMovements.reduce((s, m) => s + m.sets, 0);
-    const totalVolume = allMovements.reduce((s, m) => {
-      const avgWeight = m.perSetWeight.length > 0
-        ? m.perSetWeight.reduce((a, w) => a + w, 0) / m.perSetWeight.length
-        : 0;
-      return s + avgWeight * m.reps * m.sets;
-    }, 0);
-    const categories = [...new Set(
-      allMovements
-        .map((m) => getMovementById(m.movementId)?.categoryJa)
-        .filter((c): c is string => !!c),
-    )];
-
-    const blocksJson = draft.blocks.map((b) => ({
-      name: b.name,
-      movements: b.movements.map((m) => {
-        const mv = getMovementById(m.movementId);
-        return {
-          movementId: m.movementId,
-          nameJa: mv?.nameJa ?? "",
-          categoryJa: mv?.categoryJa ?? "",
-          sets: m.sets,
-          reps: m.reps,
-          weight: m.perSetWeight[0] ?? 0,
-          perSetWeight: m.perSetWeight,
-          perSetReps: m.perSetReps,
-          weightMode: m.weightMode,
-          assistance: m.assistanceType,
-        };
-      }),
-    }));
-
-    return { totalSets, totalVolume, categories, blocksJson };
-  }, [draft]);
-
-  const handleSave = useCallback(async () => {
-    if (!user) {
-      showToast("ログインするとワークアウトを保存できます", "info");
-      return;
-    }
-
-    setSaving(true);
-    const supabase = createClient();
-    const { totalSets, totalVolume, categories, blocksJson } = buildPayload();
-
-    const payload = {
-      user_id: user.id,
-      title: draft.title,
-      workout_date: draft.date,
-      description: draft.description,
-      blocks_json: blocksJson as Json,
-      total_sets: totalSets,
-      total_volume: totalVolume,
-      categories,
-      duration_min: null,
-    };
-
-    let error;
-    if (editId) {
-      ({ error } = await supabase.from("workouts").update(payload).eq("id", editId));
-    } else {
-      ({ error } = await supabase.from("workouts").insert(payload));
-    }
-
-    setSaving(false);
-
-    if (error) {
-      showToast("保存に失敗しました: " + error.message, "error");
-      return;
-    }
-
-    showToast(editId ? "ワークアウトを更新しました" : "ワークアウトを保存しました", "success");
-    setTimeout(() => router.push("/workouts"), 600);
-  }, [draft, router, user, editId, buildPayload, showToast]);
-
-  const handleCapture = useCallback(
-    async (movementId: string) => {
-      const movement = getMovementById(movementId);
-      if (!movement) return;
-
-      let workoutId = editId;
-
-      if (!workoutId && user) {
-        setSaving(true);
-        const supabase = createClient();
-        const { totalSets, totalVolume, categories, blocksJson } = buildPayload();
-        const { data, error } = await supabase
-          .from("workouts")
-          .insert({
-            user_id: user.id,
-            title: draft.title,
-            workout_date: draft.date,
-            description: draft.description,
-            blocks_json: blocksJson as Json,
-            total_sets: totalSets,
-            total_volume: totalVolume,
-            categories,
-            duration_min: null,
-          })
-          .select("id")
-          .single();
-        setSaving(false);
-
-        if (error || !data) {
-          showToast("保存に失敗しました", "error");
-          return;
-        }
-        workoutId = data.id;
+  const loadTemplate = useCallback(
+    (tpl: { title: string; blocks_json: Json }) => {
+      const blocks = blocksJsonToDraft(tpl.blocks_json);
+      setDraft((prev) => ({
+        ...prev,
+        title: tpl.title,
+        blocks: blocks.length > 0 ? blocks : [createEmptyBlock(0)],
+      }));
+      if (blocks.some((b) => b.movements.length > 0)) {
+        setHasAddedMovement(true);
       }
-
-      sessionStorage.setItem(
-        "captureContext",
-        JSON.stringify({
-          workoutId,
-          exerciseName: movement.nameJa,
-        }),
-      );
-      router.push("/capture");
+      persistence.setTemplatePickerOpen(false);
+      showToast("テンプレートを読み込みました", "success");
     },
-    [editId, user, draft, buildPayload, router, showToast],
+    [showToast, persistence],
   );
 
-  const handleSaveAsTemplate = useCallback(async () => {
-    if (!user) {
-      showToast("ログインするとテンプレートを保存できます", "info");
-      return;
-    }
-
-    setSavingTemplate(true);
-    const supabase = createClient();
-    const { categories, blocksJson } = buildPayload();
-
-    const { error } = await supabase.from("workout_templates").insert({
-      user_id: user.id,
-      title: draft.title,
-      blocks_json: blocksJson as Json,
-      categories,
-    });
-
-    setSavingTemplate(false);
-
-    if (error) {
-      showToast("テンプレート保存に失敗しました", "error");
-      return;
-    }
-
-    showToast("テンプレートとして保存しました", "success");
-  }, [user, draft, buildPayload, showToast]);
-
-  const openTemplatePicker = useCallback(async () => {
-    if (!user) {
-      showToast("ログインするとテンプレートを利用できます", "info");
-      return;
-    }
-
-    setLoadingTemplates(true);
-    setTemplatePickerOpen(true);
-    const supabase = createClient();
-    const { data } = await supabase
-      .from("workout_templates")
-      .select("id, title, blocks_json, categories")
-      .eq("user_id", user.id)
-      .order("updated_at", { ascending: false });
-
-    setTemplates((data as TemplateRow[] | null) ?? []);
-    setLoadingTemplates(false);
-  }, [user, showToast]);
-
-  const loadTemplate = useCallback((tpl: TemplateRow) => {
-    const blocks = blocksJsonToDraft(tpl.blocks_json);
-    setDraft((prev) => ({
-      ...prev,
-      title: tpl.title,
-      blocks: blocks.length > 0 ? blocks : [createEmptyBlock(0)],
-    }));
-    if (blocks.some((b) => b.movements.length > 0)) {
-      setHasAddedMovement(true);
-    }
-    setTemplatePickerOpen(false);
-    showToast("テンプレートを読み込みました", "success");
-  }, [showToast]);
-
-  const dismissAddToast = useCallback(() => setShowAddToast(false), []);
-
+  // ── Loading state ──
   if (loadingExisting) {
     return (
       <div className="flex items-center justify-center py-24">
@@ -471,7 +238,7 @@ function WorkoutEditInner() {
     );
   }
 
-  /* ── Render: Movement List ── */
+  // ── Movement List screen ──
   if (view.screen === "list") {
     return (
       <div key={transitionKey} className={`fixed inset-0 z-40 ${animClass}`}>
@@ -484,7 +251,7 @@ function WorkoutEditInner() {
     );
   }
 
-  /* ── Render: Movement Detail ── */
+  // ── Movement Detail screen ──
   if (view.screen === "detail" && currentConfig) {
     const movement = getMovementById(view.movementId);
     if (!movement) return null;
@@ -497,13 +264,13 @@ function WorkoutEditInner() {
           onAdd={handleAddMovement}
           onBack={() => navigate({ screen: "list" }, "back")}
           onAddAndSave={handleAddAndSave}
-          saving={saving}
+          saving={persistence.saving}
         />
       </div>
     );
   }
 
-  /* ── Render: Editor ── */
+  // ── Editor screen ──
   const totalMovements = draft.blocks.reduce((acc, b) => acc + b.movements.length, 0);
 
   return (
@@ -559,7 +326,7 @@ function WorkoutEditInner() {
         <div className="mt-4 flex gap-2">
           <button
             type="button"
-            onClick={openTemplatePicker}
+            onClick={persistence.openTemplatePicker}
             className="flex items-center gap-1.5 rounded-xl bg-white px-4 py-2.5 text-xs font-extrabold text-secondary shadow-[0_0_0_1px_rgba(0,0,0,.04)] transition-all duration-150 active:scale-[0.97]"
           >
             <BookOpen size={13} strokeWidth={2} />
@@ -568,11 +335,15 @@ function WorkoutEditInner() {
           {hasAddedMovement && (
             <button
               type="button"
-              onClick={handleSaveAsTemplate}
-              disabled={savingTemplate}
+              onClick={persistence.handleSaveAsTemplate}
+              disabled={persistence.savingTemplate}
               className="flex items-center gap-1.5 rounded-xl bg-white px-4 py-2.5 text-xs font-extrabold text-secondary shadow-[0_0_0_1px_rgba(0,0,0,.04)] transition-all duration-150 active:scale-[0.97] disabled:opacity-60"
             >
-              {savingTemplate ? <Loader2 size={13} className="animate-spin" /> : <BookmarkPlus size={13} strokeWidth={2} />}
+              {persistence.savingTemplate ? (
+                <Loader2 size={13} className="animate-spin" />
+              ) : (
+                <BookmarkPlus size={13} strokeWidth={2} />
+              )}
               テンプレートとして保存
             </button>
           )}
@@ -600,7 +371,12 @@ function WorkoutEditInner() {
         {/* Blocks */}
         <div className="mt-3 space-y-5">
           {draft.blocks.map((block, i) => (
-            <BlockCard key={block.id} block={block} onAddMove={() => handleAddMove(i)} onCapture={handleCapture} />
+            <BlockCard
+              key={block.id}
+              block={block}
+              onAddMove={() => handleAddMove(i)}
+              onCapture={persistence.handleCapture}
+            />
           ))}
         </div>
 
@@ -632,68 +408,23 @@ function WorkoutEditInner() {
             </Link>
           </>
         )}
-
       </div>
 
       {/* Template picker modal */}
-      {templatePickerOpen && (
-        <>
-          <button
-            type="button"
-            className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-[2px]"
-            onClick={() => setTemplatePickerOpen(false)}
-            aria-label="閉じる"
-          />
-          <div className="fixed inset-x-0 bottom-0 z-[110] mx-auto max-w-md" role="dialog" aria-modal="true" aria-label="テンプレート一覧">
-            <div className="max-h-[70dvh] overflow-y-auto rounded-t-[18px] bg-white pb-[max(1.5rem,calc(0.75rem+env(safe-area-inset-bottom,0px)))] pt-4 shadow-[0_-8px_32px_rgba(0,0,0,0.12)] animate-fade-in">
-              <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-border" aria-hidden />
-              <div className="px-5">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-bold tracking-tight">テンプレートから作成</h3>
-                  <button
-                    type="button"
-                    onClick={() => setTemplatePickerOpen(false)}
-                    className="flex h-8 w-8 items-center justify-center rounded-full text-secondary transition-all active:bg-chip active:scale-95"
-                    aria-label="閉じる"
-                  >
-                    <X size={18} strokeWidth={1.5} />
-                  </button>
-                </div>
-                {loadingTemplates ? (
-                  <div className="flex justify-center py-12">
-                    <Loader2 size={20} className="animate-spin text-muted" />
-                  </div>
-                ) : templates.length === 0 ? (
-                  <div className="py-12 text-center">
-                    <p className="text-sm text-secondary">テンプレートがありません</p>
-                    <p className="mt-1 text-xs text-muted">ワークアウト作成後に「テンプレートとして保存」できます</p>
-                  </div>
-                ) : (
-                  <div className="mt-4 space-y-2">
-                    {templates.map((tpl) => (
-                      <button
-                        key={tpl.id}
-                        type="button"
-                        onClick={() => loadTemplate(tpl)}
-                        className="w-full rounded-[14px] bg-surface px-4 py-3.5 text-left transition-all duration-150 active:scale-[0.99]"
-                      >
-                        <p className="text-sm font-bold tracking-tight">{tpl.title}</p>
-                        <div className="mt-1.5 flex flex-wrap gap-1">
-                          {tpl.categories.map((c) => (
-                            <span key={c} className="rounded-full bg-chip px-2.5 py-0.5 text-xs font-extrabold text-secondary">{c}</span>
-                          ))}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </>
+      {persistence.templatePickerOpen && (
+        <TemplatePickerSheet
+          templates={persistence.templates}
+          loading={persistence.loadingTemplates}
+          onSelect={loadTemplate}
+          onClose={() => persistence.setTemplatePickerOpen(false)}
+        />
       )}
 
-      <Toast message="種目を追加しました" visible={showAddToast} onDismiss={dismissAddToast} />
+      <Toast
+        message="種目を追加しました"
+        visible={showAddToast}
+        onDismiss={() => setShowAddToast(false)}
+      />
       <AppToast toast={toast} onDismiss={dismissToast} />
       <BlockExplainerModal
         open={blockExplainerOpen}
@@ -705,7 +436,10 @@ function WorkoutEditInner() {
         description="入力した内容が失われます。よろしいですか？"
         confirmLabel="破棄する"
         danger
-        onConfirm={() => { setDiscardConfirmOpen(false); router.push("/workouts"); }}
+        onConfirm={() => {
+          setDiscardConfirmOpen(false);
+          router.push("/workouts");
+        }}
         onCancel={() => setDiscardConfirmOpen(false)}
       />
     </div>

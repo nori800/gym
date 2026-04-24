@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState, useEffect } from "react";
 
 export interface AngleMeasurement {
   id: string;
@@ -115,6 +115,21 @@ export function AngleTool({
     setPending([]);
     onClear();
   }, [onClear]);
+
+  useEffect(() => {
+    if (!active) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setPending([]);
+      } else if (e.key === "z" && (e.ctrlKey || e.metaKey) && pending.length > 0) {
+        e.preventDefault();
+        setPending((prev) => prev.slice(0, -1));
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [active, pending.length]);
 
   return (
     <>
