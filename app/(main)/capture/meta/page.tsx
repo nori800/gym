@@ -2,10 +2,9 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Check, Camera, Dumbbell, Loader2 } from "lucide-react";
+import { ArrowLeft, Check, Camera, Save, Loader2 } from "lucide-react";
 import { MOVEMENTS } from "@/lib/mocks/movements";
 import { PrimaryRecordButton } from "@/components/common/PrimaryRecordButton";
-import { Stepper } from "@/components/workout/Stepper";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { createClient } from "@/lib/supabase/client";
 import { inferVideoUploadMeta } from "@/lib/capture/recorderMime";
@@ -21,18 +20,34 @@ export default function CaptureMetaPage() {
   const [videoBlob, setVideoBlob] = useState<Blob | null>(null);
   const [duration, setDuration] = useState(0);
 
-  const [exercise, setExercise] = useState("");
-  const [weight, setWeight] = useState(0);
-  const [reps, setReps] = useState(0);
-  const [sets, setSets] = useState(0);
+  const [exercise, setExercise] = useState(() => {
+    if (typeof window === "undefined") return "";
+    try {
+      const ctx = sessionStorage.getItem("captureContext");
+      if (ctx) return (JSON.parse(ctx) as { exerciseName?: string }).exerciseName ?? "";
+    } catch { /* ignore */ }
+    return "";
+  });
   const [memo, setMemo] = useState("");
-  const [linkedWorkoutId, setLinkedWorkoutId] = useState("");
+  const [linkedWorkoutId, setLinkedWorkoutId] = useState(() => {
+    if (typeof window === "undefined") return "";
+    try {
+      const ctx = sessionStorage.getItem("captureContext");
+      if (ctx) return (JSON.parse(ctx) as { workoutId?: string }).workoutId ?? "";
+    } catch { /* ignore */ }
+    return "";
+  });
+  const [fromWorkout] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return !!sessionStorage.getItem("captureContext");
+  });
 
   const [exerciseError, setExerciseError] = useState(false);
   const [phase, setPhase] = useState<Phase>("input");
   const [recentWorkouts, setRecentWorkouts] = useState<RecentWorkout[]>([]);
 
   const [blobError, setBlobError] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     const url = sessionStorage.getItem("capturedVideoUrl");
@@ -58,7 +73,6 @@ export default function CaptureMetaPage() {
       });
 
     return () => {
-      // メタページ離脱時に blob URL を解放
       if (url.startsWith("blob:")) {
         URL.revokeObjectURL(url);
       }
@@ -79,48 +93,43 @@ export default function CaptureMetaPage() {
       });
   }, [user]);
 
-  const uploadAndSave = useCallback(
-    async (videoOnly: boolean) => {
-      if (!user || !videoBlob) return false;
+  const uploadAndSave = useCallback(async () => {
+    if (!user || !videoBlob) return false;
 
-      const supabase = createClient();
-      const videoId = crypto.randomUUID();
-      const { fileExt, contentType } = inferVideoUploadMeta(videoBlob);
-      const filePath = `${user.id}/${videoId}${fileExt}`;
+    const supabase = createClient();
+    const videoId = crypto.randomUUID();
+    const { fileExt, contentType } = inferVideoUploadMeta(videoBlob);
+    const filePath = `${user.id}/${videoId}${fileExt}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from("videos")
-        .upload(filePath, videoBlob, { contentType });
+    const { error: uploadError } = await supabase.storage
+      .from("videos")
+      .upload(filePath, videoBlob, { contentType });
 
-      if (uploadError) {
-        console.error("video upload error:", uploadError.message);
-        return false;
-      }
+    if (uploadError) {
+      console.error("video upload error:", uploadError.message);
+      return false;
+    }
 
-      const today = new Date().toISOString().split("T")[0];
+    const today = new Date().toISOString().split("T")[0];
 
-      const { error: insertError } = await supabase.from("videos").insert({
-        id: videoId,
-        user_id: user.id,
-        title: videoOnly ? (exercise || "無題の動画") : `${exercise} ${weight ? weight + "kg" : ""}`.trim(),
-        exercise_type: exercise || "",
-        shot_date: today,
-        file_path: filePath,
-        duration,
-        memo: memo || null,
-        workout_id: linkedWorkoutId || null,
-      });
+    const { error: insertError } = await supabase.from("videos").insert({
+      id: videoId,
+      user_id: user.id,
+      title: exercise || "無題の動画",
+      exercise_type: exercise || "",
+      shot_date: today,
+      file_path: filePath,
+      duration,
+      memo: memo || null,
+      workout_id: linkedWorkoutId || null,
+    });
 
-      if (insertError) {
-        console.error("video insert error:", insertError.message);
-        return false;
-      }
-      return true;
-    },
-    [user, videoBlob, exercise, weight, duration, memo, linkedWorkoutId],
-  );
-
-  const [saveError, setSaveError] = useState<string | null>(null);
+    if (insertError) {
+      console.error("video insert error:", insertError.message);
+      return false;
+    }
+    return true;
+  }, [user, videoBlob, exercise, duration, memo, linkedWorkoutId]);
 
   const handleSave = useCallback(async () => {
     if (!exercise) {
@@ -137,7 +146,7 @@ export default function CaptureMetaPage() {
     setSaveError(null);
 
     if (user && videoBlob) {
-      const ok = await uploadAndSave(false);
+      const ok = await uploadAndSave();
       if (!ok) {
         setSaveError("動画のアップロードに失敗しました。もう一度お試しください。");
         setPhase("input");
@@ -147,6 +156,7 @@ export default function CaptureMetaPage() {
 
     sessionStorage.removeItem("capturedVideoUrl");
     sessionStorage.removeItem("capturedDuration");
+    sessionStorage.removeItem("captureContext");
     setPhase("saved");
   }, [exercise, user, videoBlob, uploadAndSave]);
 
@@ -160,7 +170,7 @@ export default function CaptureMetaPage() {
     setSaveError(null);
 
     if (user && videoBlob) {
-      const ok = await uploadAndSave(true);
+      const ok = await uploadAndSave();
       if (!ok) {
         setSaveError("動画のアップロードに失敗しました。もう一度お試しください。");
         setPhase("input");
@@ -170,6 +180,7 @@ export default function CaptureMetaPage() {
 
     sessionStorage.removeItem("capturedVideoUrl");
     sessionStorage.removeItem("capturedDuration");
+    sessionStorage.removeItem("captureContext");
     router.push("/videos");
   }, [user, videoBlob, uploadAndSave, router]);
 
@@ -188,15 +199,6 @@ export default function CaptureMetaPage() {
   }
 
   if (phase === "saved") {
-    const summary = [
-      exercise,
-      weight ? `${weight}kg` : null,
-      reps ? `${reps}回` : null,
-      sets ? `${sets}セット` : null,
-    ]
-      .filter(Boolean)
-      .join(" · ");
-
     const linkedTitle = recentWorkouts.find((w) => w.id === linkedWorkoutId)?.title;
 
     return (
@@ -205,7 +207,7 @@ export default function CaptureMetaPage() {
           <Check size={28} strokeWidth={2} className="text-on-inverse" />
         </div>
         <p className="mt-5 text-lg font-title">保存しました</p>
-        <p className="mt-2 text-center text-sm text-secondary">{summary}</p>
+        <p className="mt-2 text-center text-sm text-secondary">{exercise}</p>
         {linkedTitle && (
           <p className="mt-2 text-center text-[12px] text-muted">
             ワークアウト「{linkedTitle}」に紐付けました
@@ -214,15 +216,25 @@ export default function CaptureMetaPage() {
         <div className="mt-10 w-full max-w-sm space-y-3">
           <PrimaryRecordButton type="button" onClick={() => router.push("/capture")}>
             <Camera size={16} strokeWidth={1.5} />
-            もう1セット撮影
+            もう1本撮影
           </PrimaryRecordButton>
-          <button
-            type="button"
-            onClick={() => router.push("/workouts")}
-            className="min-h-[44px] w-full rounded-xl text-sm font-bold text-secondary transition-colors active:bg-chip"
-          >
-            完了
-          </button>
+          {fromWorkout && linkedWorkoutId ? (
+            <button
+              type="button"
+              onClick={() => router.push(`/workouts/edit?id=${linkedWorkoutId}`)}
+              className="min-h-[44px] w-full rounded-xl text-sm font-bold text-secondary transition-colors active:bg-chip"
+            >
+              ワークアウトに戻る
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => router.push("/videos")}
+              className="min-h-[44px] w-full rounded-xl text-sm font-bold text-secondary transition-colors active:bg-chip"
+            >
+              動画ライブラリへ
+            </button>
+          )}
         </div>
       </div>
     );
@@ -250,7 +262,9 @@ export default function CaptureMetaPage() {
         </button>
         <div>
           <p className="text-xs font-title uppercase tracking-[0.12em] text-muted">Capture</p>
-          <h1 className="text-lg font-bold tracking-tight">セットを記録</h1>
+          <h1 className="text-lg font-bold tracking-tight">
+            {fromWorkout ? "種目を撮影" : "動画を保存"}
+          </h1>
         </div>
       </div>
 
@@ -294,41 +308,12 @@ export default function CaptureMetaPage() {
         )}
       </div>
 
-      {/* SETS & REPS */}
-      <div className="px-[18px]">
-        <h4 className="text-xs font-title uppercase tracking-wider text-primary">
-          セット & レップス
-        </h4>
-        <p className="mt-1 text-[12px] leading-relaxed text-secondary">
-          セット＝同じ動作の繰り返しを1まとまりにした単位。レップ（回数）＝1セット内で動作を行う回数です。
-        </p>
-      </div>
-
-      <div className="overflow-hidden rounded-[18px] bg-white shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
-        <div className="flex min-h-[62px] items-center justify-between px-[18px]">
-          <span className="text-lg font-semibold">重量</span>
-          <div className="flex items-center gap-2">
-            <Stepper value={weight} onChange={setWeight} min={0} max={500} step={2.5} allowDecimal label="重量" />
-            <span className="text-sm text-muted">kg</span>
-          </div>
-        </div>
-        <div className="flex min-h-[62px] items-center justify-between border-t border-border px-[18px]">
-          <span className="text-lg font-semibold">回数</span>
-          <Stepper value={reps} onChange={setReps} min={0} max={50} label="回数" />
-        </div>
-        <div className="flex min-h-[62px] items-center justify-between border-t border-border px-[18px]">
-          <span className="text-lg font-semibold">セット</span>
-          <Stepper value={sets} onChange={setSets} min={0} max={20} label="セット" />
-        </div>
-      </div>
-
-      <p className="px-1 text-xs text-muted">
-        数字をタップで直接入力、± で細かく調整できます
-      </p>
-
       {/* MEMO */}
       <div className="px-[18px]">
         <h4 className="text-xs font-title uppercase tracking-wider text-primary">メモ</h4>
+        <p className="mt-1 text-[12px] leading-relaxed text-secondary">
+          フォームの気づきなどを残せます
+        </p>
       </div>
 
       <div className="overflow-hidden rounded-[18px] bg-white shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
@@ -337,7 +322,7 @@ export default function CaptureMetaPage() {
           onChange={(e) => setMemo(e.target.value)}
           rows={2}
           maxLength={500}
-          placeholder="フォームの気づきなど"
+          placeholder="気になった点、改善ポイントなど"
           className="w-full bg-white px-[18px] py-3.5 text-sm text-primary placeholder:text-muted focus:outline-none"
         />
       </div>
@@ -348,7 +333,7 @@ export default function CaptureMetaPage() {
           ワークアウトに紐付ける
         </h4>
         <p className="mt-1 text-[12px] leading-relaxed text-secondary">
-          履歴のセッションと動画がひも付きます。未選択の場合は動画ライブラリのみに保存されます。
+          紐付けると、ワークアウト履歴から動画をすぐに確認できます。重量・回数などの記録はワークアウト側で管理されます。
         </p>
       </div>
 
@@ -392,17 +377,19 @@ export default function CaptureMetaPage() {
       {/* Save buttons */}
       <div className="space-y-2.5">
         <PrimaryRecordButton type="button" onClick={handleSave} disabled={blobError}>
-          <Dumbbell size={16} strokeWidth={1.5} />
-          記録する
+          <Save size={16} strokeWidth={1.5} />
+          保存する
         </PrimaryRecordButton>
-        <button
-          type="button"
-          onClick={handleVideoOnly}
-          disabled={blobError}
-          className="min-h-[44px] w-full rounded-xl text-sm font-bold text-secondary transition-colors active:bg-chip disabled:opacity-40"
-        >
-          動画だけ保存する
-        </button>
+        {!fromWorkout && (
+          <button
+            type="button"
+            onClick={handleVideoOnly}
+            disabled={blobError}
+            className="min-h-[44px] w-full rounded-xl text-sm font-bold text-secondary transition-colors active:bg-chip disabled:opacity-40"
+          >
+            種目を選ばずに保存
+          </button>
+        )}
       </div>
     </div>
   );

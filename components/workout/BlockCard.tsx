@@ -1,5 +1,6 @@
 "use client";
 
+import { Camera } from "lucide-react";
 import type { Block } from "@/types/workout";
 import { formatBlockSetsLabel, formatMovementMeta } from "@/types/workout";
 import { getMovementById } from "@/lib/mocks/movements";
@@ -7,9 +8,10 @@ import { getMovementById } from "@/lib/mocks/movements";
 interface BlockCardProps {
   block: Block;
   onAddMove: () => void;
+  onCapture?: (movementId: string) => void;
 }
 
-export function BlockCard({ block, onAddMove }: BlockCardProps) {
+export function BlockCard({ block, onAddMove, onCapture }: BlockCardProps) {
   const setsLabel = formatBlockSetsLabel(block);
   const isEmpty = block.movements.length === 0;
 
@@ -65,7 +67,19 @@ export function BlockCard({ block, onAddMove }: BlockCardProps) {
                       {formatMovementMeta(config)}
                     </p>
                   </div>
-                  <div className="flex h-5 w-5 items-center justify-center text-muted">⠿</div>
+                  <div className="flex items-center gap-1.5">
+                    {onCapture && (
+                      <button
+                        type="button"
+                        onClick={() => onCapture(config.movementId)}
+                        className="flex h-8 w-8 items-center justify-center rounded-full text-muted transition-all active:bg-surface active:scale-95"
+                        aria-label={`${movement.nameJa}を撮影`}
+                      >
+                        <Camera size={15} strokeWidth={1.5} />
+                      </button>
+                    )}
+                    <div className="flex h-5 w-5 items-center justify-center text-muted">⠿</div>
+                  </div>
                 </div>
               );
             })}

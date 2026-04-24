@@ -262,6 +262,53 @@ function WorkoutEditInner() {
     setTimeout(() => router.push("/workouts"), 600);
   }, [draft, router, user, editId, buildPayload, showToast]);
 
+  const handleCapture = useCallback(
+    async (movementId: string) => {
+      const movement = getMovementById(movementId);
+      if (!movement) return;
+
+      let workoutId = editId;
+
+      if (!workoutId && user) {
+        setSaving(true);
+        const supabase = createClient();
+        const { totalSets, totalVolume, categories, blocksJson } = buildPayload();
+        const { data, error } = await supabase
+          .from("workouts")
+          .insert({
+            user_id: user.id,
+            title: draft.title,
+            workout_date: draft.date,
+            description: draft.description,
+            blocks_json: blocksJson as Json,
+            total_sets: totalSets,
+            total_volume: totalVolume,
+            categories,
+            duration_min: null,
+          })
+          .select("id")
+          .single();
+        setSaving(false);
+
+        if (error || !data) {
+          showToast("保存に失敗しました", "error");
+          return;
+        }
+        workoutId = data.id;
+      }
+
+      sessionStorage.setItem(
+        "captureContext",
+        JSON.stringify({
+          workoutId,
+          exerciseName: movement.nameJa,
+        }),
+      );
+      router.push("/capture");
+    },
+    [editId, user, draft, buildPayload, router, showToast],
+  );
+
   const handleSaveAsTemplate = useCallback(async () => {
     if (!user) {
       showToast("ログインするとテンプレートを保存できます", "info");
@@ -378,19 +425,15 @@ function WorkoutEditInner() {
           >
             <X size={20} strokeWidth={1.5} />
           </button>
-          <div className="flex items-center gap-2">
-            {hasAddedMovement && (
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={saving}
-                className="flex items-center gap-2 rounded-xl bg-inverse px-5 py-2.5 text-sm font-extrabold tracking-wide text-on-inverse transition-all duration-150 active:scale-[0.97] disabled:opacity-60"
-              >
-                {saving && <Loader2 size={14} className="animate-spin" />}
-                {editId ? "更新" : "保存"}
-              </button>
-            )}
-          </div>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            className="flex items-center gap-2 rounded-xl bg-inverse px-5 py-2.5 text-sm font-extrabold tracking-wide text-on-inverse transition-all duration-150 active:scale-[0.97] disabled:opacity-60"
+          >
+            {saving && <Loader2 size={14} className="animate-spin" />}
+            {editId ? "更新" : "保存"}
+          </button>
         </div>
 
         {/* Title */}
@@ -471,7 +514,7 @@ function WorkoutEditInner() {
         {/* Blocks */}
         <div className="mt-3 space-y-5">
           {draft.blocks.map((block, i) => (
-            <BlockCard key={block.id} block={block} onAddMove={() => handleAddMove(i)} />
+            <BlockCard key={block.id} block={block} onAddMove={() => handleAddMove(i)} onCapture={handleCapture} />
           ))}
         </div>
 
@@ -501,19 +544,19 @@ function WorkoutEditInner() {
                 </p>
               </div>
             </Link>
-
-            {/* Bottom save button */}
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving}
-              className="mt-6 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-inverse text-base font-extrabold tracking-wide text-on-inverse shadow-lg transition-all duration-150 active:scale-[0.97] disabled:opacity-60"
-            >
-              {saving && <Loader2 size={16} className="animate-spin" />}
-              {editId ? "ワークアウトを更新" : "ワークアウトを保存"}
-            </button>
           </>
         )}
+
+        {/* Bottom save button — always visible */}
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={saving}
+          className="mt-6 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-inverse text-base font-extrabold tracking-wide text-on-inverse shadow-lg transition-all duration-150 active:scale-[0.97] disabled:opacity-60"
+        >
+          {saving && <Loader2 size={16} className="animate-spin" />}
+          {editId ? "ワークアウトを更新" : "ワークアウトを保存"}
+        </button>
       </div>
 
       {/* Template picker modal */}
