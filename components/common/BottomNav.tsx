@@ -98,7 +98,10 @@ export function BottomNav({ userRole }: { userRole?: string }) {
         .select("role")
         .eq("user_id", data.user.id)
         .single()
-        .then(({ data: profile }) => {
+        .then(({ data: profile, error }) => {
+          if (error) {
+            console.error("[BottomNav] profile fetch error:", error.message);
+          }
           if (!cancelled) setResolvedRole(profile?.role ?? null);
         });
     });

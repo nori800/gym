@@ -29,7 +29,7 @@ export function BlockExplainerModal({ open, onClose }: BlockExplainerModalProps)
               <button
                 type="button"
                 onClick={onClose}
-                className="flex h-8 w-8 items-center justify-center rounded-full text-secondary transition-all active:bg-chip active:scale-95"
+                className="flex h-11 w-11 items-center justify-center rounded-full text-secondary transition-all active:bg-chip active:scale-95"
                 aria-label="閉じる"
               >
                 <X size={18} strokeWidth={1.5} />

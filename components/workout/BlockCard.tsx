@@ -27,7 +27,7 @@ export function BlockCard({ block, onAddMove, onCapture }: BlockCardProps) {
         </div>
         <button
           type="button"
-          className="flex h-8 w-8 items-center justify-center text-on-inverse/50 transition-colors active:text-on-inverse"
+          className="flex h-11 w-11 items-center justify-center text-on-inverse/50 transition-colors active:text-on-inverse"
           aria-label="ブロックオプション（準備中）"
           aria-disabled="true"
         >
@@ -72,7 +72,7 @@ export function BlockCard({ block, onAddMove, onCapture }: BlockCardProps) {
                       <button
                         type="button"
                         onClick={() => onCapture(config.movementId)}
-                        className="flex h-8 w-8 items-center justify-center rounded-full text-muted transition-all active:bg-surface active:scale-95"
+                        className="flex h-11 w-11 items-center justify-center rounded-full text-muted transition-all active:bg-surface active:scale-95"
                         aria-label={`${movement.nameJa}を撮影`}
                       >
                         <Camera size={15} strokeWidth={1.5} />

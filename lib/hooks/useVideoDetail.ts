@@ -165,25 +165,31 @@ export function useVideoDetail(
       }
 
       if (data.workout_id) {
-        const { data: wo } = await supabase
+        const { data: wo, error: woErr } = await supabase
           .from("workouts")
           .select("title")
           .eq("id", data.workout_id)
           .single();
+        if (woErr) {
+          console.error("[useVideoDetail] workout title fetch error:", woErr.message);
+        }
         if (wo?.title) setLinkedWorkoutTitle(wo.title);
       } else {
         setLinkedWorkoutTitle(null);
       }
 
-      const { data: list } = await supabase
+      const { data: list, error: listErr } = await supabase
         .from("workouts")
         .select("id, title, workout_date")
         .eq("user_id", userId)
         .order("workout_date", { ascending: false })
         .limit(20);
+      if (listErr) {
+        console.error("[useVideoDetail] recent workouts fetch error:", listErr.message);
+      }
       if (list) setRecentWorkouts(list as RecentWorkout[]);
 
-      const { data: ann } = await supabase
+      const { data: ann, error: annErr } = await supabase
         .from("video_annotations")
         .select("*")
         .eq("video_id", data.id)
@@ -191,6 +197,9 @@ export function useVideoDetail(
         .order("updated_at", { ascending: false })
         .limit(1)
         .maybeSingle();
+      if (annErr) {
+        console.error("[useVideoDetail] annotation fetch error:", annErr.message);
+      }
 
       if (ann) {
         const row = ann as unknown as AnnotationRow;
@@ -353,14 +362,20 @@ export function useVideoDetail(
     }
 
     if (video.thumbnail_path) {
-      await supabase.storage.from("videos").remove([video.thumbnail_path]);
+      const { error: thumbErr } = await supabase.storage.from("videos").remove([video.thumbnail_path]);
+      if (thumbErr) {
+        console.error("[useVideoDetail] thumbnail delete error:", thumbErr.message);
+      }
     }
 
-    await supabase
+    const { error: annDelErr } = await supabase
       .from("video_annotations")
       .delete()
       .eq("video_id", video.id)
       .eq("user_id", userId);
+    if (annDelErr) {
+      console.error("[useVideoDetail] annotation delete error:", annDelErr.message);
+    }
 
     const { error: dbErr } = await supabase
       .from("videos")

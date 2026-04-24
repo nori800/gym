@@ -20,7 +20,7 @@ const config: Config = {
         border: "#EBEBEB",
         primary: "#1A1A1A",
         secondary: "#6B6B6B",
-        muted: "#999999",
+        muted: "#767676",
         chip: "#ececec",
         chart: {
           line: "#3eed8d",

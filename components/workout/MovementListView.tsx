@@ -98,7 +98,7 @@ export function MovementListView({
             <button
               type="button"
               onClick={() => setQuery("")}
-              className="flex h-6 w-6 items-center justify-center rounded-full text-secondary transition-colors active:text-primary"
+              className="flex h-11 w-11 items-center justify-center rounded-full text-secondary transition-colors active:text-primary"
               aria-label="検索をクリア"
             >
               <X size={14} strokeWidth={1.5} />

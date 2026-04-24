@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft, Pencil, Layers, ChevronDown, ChevronUp,
-  Loader2, Link2,
+  Loader2, Link2, Ruler, Move, Share2,
 } from "lucide-react";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useToast } from "@/lib/hooks/useToast";
@@ -21,8 +21,11 @@ import { VideoDetailHeader } from "@/components/video-detail/VideoDetailHeader";
 import { PlaybackControls } from "@/components/video-detail/PlaybackControls";
 import { MemoPanel } from "@/components/video-detail/MemoPanel";
 import { WorkoutLinkPanel } from "@/components/video-detail/WorkoutLinkPanel";
+import { AngleTool, type AngleMeasurement } from "@/components/player/AngleTool";
+import { CustomGuides, type Guide } from "@/components/player/CustomGuides";
+import { ShareLinkButton } from "@/components/video-detail/ShareLinkButton";
 
-type Panel = "overlay" | "draw" | null;
+type Panel = "overlay" | "draw" | "angle" | "guides" | null;
 
 export default function VideoDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -38,6 +41,9 @@ export default function VideoDetailPage() {
   const [panel, setPanel] = useState<Panel>(null);
   const [memoOpen, setMemoOpen] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
+
+  const [angleMeasurements, setAngleMeasurements] = useState<AngleMeasurement[]>([]);
+  const [customGuides, setCustomGuides] = useState<Guide[]>([]);
 
   const handleVideoError = useCallback(() => {
     if (!detail.videoSrc) return;
@@ -168,6 +174,24 @@ export default function VideoDetailPage() {
           width={1920}
           height={1080}
         />
+
+        <AngleTool
+          active={panel === "angle"}
+          measurements={angleMeasurements}
+          onAdd={(m) => setAngleMeasurements((prev) => [...prev, m])}
+          onClear={() => setAngleMeasurements([])}
+          width={1920}
+          height={1080}
+        />
+
+        {panel === "guides" && (
+          <CustomGuides
+            guides={customGuides}
+            onUpdate={setCustomGuides}
+            containerWidth={1920}
+            containerHeight={1080}
+          />
+        )}
       </div>
 
       {/* Controls area */}
@@ -189,11 +213,11 @@ export default function VideoDetailPage() {
         />
 
         {/* Tool tabs */}
-        <div className="mt-2 flex justify-center gap-1">
+        <div className="mt-2 flex flex-wrap justify-center gap-1">
           <button
             type="button"
             onClick={() => { setPanel(panel === "overlay" ? null : "overlay"); setDrawTool("none"); }}
-            className={`flex items-center gap-1 rounded-md px-3 py-1.5 text-xs transition-colors ${
+            className={`flex min-h-[44px] items-center gap-1 rounded-md px-3 py-1.5 text-xs transition-colors ${
               panel === "overlay" ? "bg-surface text-primary" : "text-muted"
             }`}
           >
@@ -202,7 +226,7 @@ export default function VideoDetailPage() {
           <button
             type="button"
             onClick={() => setPanel(panel === "draw" ? null : "draw")}
-            className={`flex items-center gap-1 rounded-md px-3 py-1.5 text-xs transition-colors ${
+            className={`flex min-h-[44px] items-center gap-1 rounded-md px-3 py-1.5 text-xs transition-colors ${
               panel === "draw" ? "bg-surface text-primary" : "text-muted"
             }`}
           >
@@ -210,8 +234,26 @@ export default function VideoDetailPage() {
           </button>
           <button
             type="button"
+            onClick={() => setPanel(panel === "angle" ? null : "angle")}
+            className={`flex min-h-[44px] items-center gap-1 rounded-md px-3 py-1.5 text-xs transition-colors ${
+              panel === "angle" ? "bg-surface text-primary" : "text-muted"
+            }`}
+          >
+            <Ruler size={13} strokeWidth={1.5} /> 角度
+          </button>
+          <button
+            type="button"
+            onClick={() => setPanel(panel === "guides" ? null : "guides")}
+            className={`flex min-h-[44px] items-center gap-1 rounded-md px-3 py-1.5 text-xs transition-colors ${
+              panel === "guides" ? "bg-surface text-primary" : "text-muted"
+            }`}
+          >
+            <Move size={13} strokeWidth={1.5} /> ガイド
+          </button>
+          <button
+            type="button"
             onClick={() => setMemoOpen(!memoOpen)}
-            className={`flex items-center gap-1 rounded-md px-3 py-1.5 text-xs transition-colors ${
+            className={`flex min-h-[44px] items-center gap-1 rounded-md px-3 py-1.5 text-xs transition-colors ${
               memoOpen ? "bg-surface text-primary" : "text-muted"
             }`}
           >
@@ -221,7 +263,7 @@ export default function VideoDetailPage() {
           <button
             type="button"
             onClick={() => setLinkOpen(!linkOpen)}
-            className={`flex items-center gap-1 rounded-md px-3 py-1.5 text-xs transition-colors ${
+            className={`flex min-h-[44px] items-center gap-1 rounded-md px-3 py-1.5 text-xs transition-colors ${
               linkOpen ? "bg-surface text-primary" : "text-muted"
             }`}
           >
@@ -274,6 +316,37 @@ export default function VideoDetailPage() {
               {detail.annotationSaving && <Loader2 size={16} className="animate-spin" />}
               描画を保存
             </button>
+          </div>
+        )}
+
+        {panel === "angle" && (
+          <div className="mt-2 rounded-lg bg-surface p-3">
+            <p className="text-xs text-secondary">
+              動画上の3点をタップして角度を測定します。Escape でキャンセル、Ctrl+Z で1点戻ります。
+            </p>
+            {angleMeasurements.length > 0 && (
+              <div className="mt-2 space-y-1">
+                {angleMeasurements.map((m) => (
+                  <div key={m.id} className="text-sm font-metric text-primary">
+                    {m.angle}°
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {panel === "guides" && (
+          <div className="mt-2 rounded-lg bg-surface p-3">
+            <p className="text-xs text-secondary">
+              水平線・垂直線を追加してドラッグで位置調整できます。矢印キーで微調整、Delete で削除。
+            </p>
+          </div>
+        )}
+
+        {video && (
+          <div className="mt-2">
+            <ShareLinkButton videoId={video.id} />
           </div>
         )}
 

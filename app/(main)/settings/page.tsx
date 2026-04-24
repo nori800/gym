@@ -3,12 +3,17 @@
 import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronRight, LogIn, LogOut, User, Bell, Trash2, X, Loader2, AlertTriangle } from "lucide-react";
+import { ChevronRight, LogIn, LogOut, User, Bell, Trash2, X, Loader2, AlertTriangle, Download, FileText } from "lucide-react";
 import { FocusTrap } from "@/components/common/FocusTrap";
 import { AppToast } from "@/components/common/AppToast";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useToast } from "@/lib/hooks/useToast";
 import { createClient } from "@/lib/supabase/client";
+import {
+  exportWorkoutsCSV,
+  exportBodyLogsCSV,
+  downloadCSV,
+} from "@/lib/utils/export";
 
 const DOMINANT_SIDE_OPTIONS = [
   { value: "left", label: "左" },
@@ -30,6 +35,84 @@ export default function SettingsPage() {
   const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [deletingAccount, setDeletingAccount] = useState(false);
+
+  const [exporting, setExporting] = useState<"workouts" | "body" | null>(null);
+
+  const handleExportWorkouts = useCallback(async () => {
+    if (!user) return;
+    setExporting("workouts");
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("workouts")
+        .select("title, workout_date, blocks_json")
+        .eq("user_id", user.id)
+        .order("workout_date", { ascending: false });
+
+      if (error) {
+        show("データの取得に失敗しました", "error");
+        return;
+      }
+
+      type BlockJson = { movements?: { nameJa?: string; weight?: number; reps?: number; sets?: number; category?: string }[] };
+      const workouts = (data ?? []).map((w) => {
+        const blocks = (Array.isArray(w.blocks_json) ? w.blocks_json : []) as BlockJson[];
+        return {
+          log_date: w.workout_date,
+          title: w.title,
+          movements: blocks.flatMap((b) =>
+            (b.movements ?? []).map((m) => ({
+              exercise_type: m.nameJa ?? "",
+              weight: m.weight,
+              reps: m.reps,
+              sets: m.sets,
+              category: m.category,
+            })),
+          ),
+        };
+      });
+
+      const csv = exportWorkoutsCSV(workouts);
+      downloadCSV(csv, `formcheck-workouts-${new Date().toISOString().split("T")[0]}.csv`);
+      show("ワークアウトデータをエクスポートしました", "success");
+    } catch {
+      show("エクスポートに失敗しました", "error");
+    } finally {
+      setExporting(null);
+    }
+  }, [user, show]);
+
+  const handleExportBody = useCallback(async () => {
+    if (!user) return;
+    setExporting("body");
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("body_logs")
+        .select("log_date, weight, body_fat_pct")
+        .eq("user_id", user.id)
+        .order("log_date", { ascending: false });
+
+      if (error) {
+        show("データの取得に失敗しました", "error");
+        return;
+      }
+
+      const logs = (data ?? []).map((l) => ({
+        log_date: l.log_date,
+        weight_kg: l.weight,
+        body_fat_pct: l.body_fat_pct,
+      }));
+
+      const csv = exportBodyLogsCSV(logs);
+      downloadCSV(csv, `formcheck-body-${new Date().toISOString().split("T")[0]}.csv`);
+      show("体組成データをエクスポートしました", "success");
+    } catch {
+      show("エクスポートに失敗しました", "error");
+    } finally {
+      setExporting(null);
+    }
+  }, [user, show]);
 
   const handleCacheClear = useCallback(() => {
     sessionStorage.clear();
@@ -107,6 +190,51 @@ export default function SettingsPage() {
         </div>
       </section>
 
+      {/* Export */}
+      {user && (
+        <section>
+          <h2 className="mb-3 px-1 text-xs font-title uppercase tracking-[0.12em] text-muted">
+            データエクスポート
+          </h2>
+          <div className="divide-y divide-border overflow-hidden rounded-[18px] bg-white shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
+            <button
+              type="button"
+              onClick={handleExportWorkouts}
+              disabled={exporting === "workouts"}
+              className="flex min-h-[62px] w-full items-center gap-3.5 px-[18px] text-left transition-colors active:bg-surface disabled:opacity-50"
+            >
+              {exporting === "workouts" ? (
+                <Loader2 size={18} strokeWidth={1.5} className="animate-spin text-primary" />
+              ) : (
+                <Download size={18} strokeWidth={1.5} className="text-primary" />
+              )}
+              <div className="flex-1">
+                <span className="text-sm font-semibold text-primary">ワークアウト CSV</span>
+                <p className="text-xs text-secondary">全ワークアウト履歴をエクスポート</p>
+              </div>
+              <ChevronRight size={16} strokeWidth={1.5} className="text-muted" />
+            </button>
+            <button
+              type="button"
+              onClick={handleExportBody}
+              disabled={exporting === "body"}
+              className="flex min-h-[62px] w-full items-center gap-3.5 px-[18px] text-left transition-colors active:bg-surface disabled:opacity-50"
+            >
+              {exporting === "body" ? (
+                <Loader2 size={18} strokeWidth={1.5} className="animate-spin text-primary" />
+              ) : (
+                <FileText size={18} strokeWidth={1.5} className="text-primary" />
+              )}
+              <div className="flex-1">
+                <span className="text-sm font-semibold text-primary">体組成 CSV</span>
+                <p className="text-xs text-secondary">体重・体脂肪率をエクスポート</p>
+              </div>
+              <ChevronRight size={16} strokeWidth={1.5} className="text-muted" />
+            </button>
+          </div>
+        </section>
+      )}
+
       {/* Data */}
       <section>
         <h2 className="mb-3 px-1 text-xs font-title uppercase tracking-[0.12em] text-muted">
@@ -145,7 +273,7 @@ export default function SettingsPage() {
         </section>
       )}
 
-      <p className="pt-4 text-center text-xs text-muted">FormCheck v0.2.0</p>
+      <p className="pt-4 text-center text-xs text-muted">FormCheck v0.5.0</p>
 
       {/* Cache clear confirmation */}
       {confirmOpen && (
@@ -170,7 +298,7 @@ export default function SettingsPage() {
                   <button
                     type="button"
                     onClick={() => setConfirmOpen(false)}
-                    className="flex h-8 w-8 items-center justify-center rounded-full text-secondary transition-all active:bg-chip active:scale-95"
+                    className="flex h-11 w-11 items-center justify-center rounded-full text-secondary transition-all active:bg-chip active:scale-95"
                     aria-label="閉じる"
                   >
                     <X size={18} strokeWidth={1.5} />
@@ -224,7 +352,7 @@ export default function SettingsPage() {
                   <button
                     type="button"
                     onClick={() => { setDeleteAccountOpen(false); setDeleteConfirmText(""); }}
-                    className="flex h-8 w-8 items-center justify-center rounded-full text-secondary transition-all active:bg-chip active:scale-95"
+                    className="flex h-11 w-11 items-center justify-center rounded-full text-secondary transition-all active:bg-chip active:scale-95"
                     aria-label="閉じる"
                   >
                     <X size={18} strokeWidth={1.5} />

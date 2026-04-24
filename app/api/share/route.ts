@@ -13,7 +13,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
   }
 
-  const body = await request.json();
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json(
+      { error: "リクエストボディが不正です" },
+      { status: 400 },
+    );
+  }
+
   const { video_id, workout_id } = body as {
     video_id?: string;
     workout_id?: string;
@@ -125,21 +134,49 @@ export async function GET(request: NextRequest) {
   const result: Record<string, unknown> = { shared_at: link.created_at };
 
   if (link.video_id) {
-    const { data: video } = await admin
+    const { data: video, error: videoErr } = await admin
       .from("videos")
-      .select("id, title, exercise_type, shot_date, duration, memo")
+      .select("id, user_id, title, exercise_type, shot_date, duration, memo")
       .eq("id", link.video_id)
       .single();
-    result.video = video;
+
+    if (videoErr || !video) {
+      return NextResponse.json(
+        { error: "共有された動画が見つかりません" },
+        { status: 404 },
+      );
+    }
+    if (video.user_id !== link.user_id) {
+      return NextResponse.json(
+        { error: "共有リンクが無効です" },
+        { status: 403 },
+      );
+    }
+    const { user_id: _u, ...safeVideo } = video;
+    result.video = safeVideo;
   }
 
   if (link.workout_id) {
-    const { data: workout } = await admin
+    const { data: workout, error: workoutErr } = await admin
       .from("workouts")
-      .select("id, title, workout_date, blocks_json, total_sets, total_volume")
+      .select("id, user_id, title, workout_date, blocks_json, total_sets, total_volume")
       .eq("id", link.workout_id)
       .single();
-    result.workout = workout;
+
+    if (workoutErr || !workout) {
+      return NextResponse.json(
+        { error: "共有されたワークアウトが見つかりません" },
+        { status: 404 },
+      );
+    }
+    if (workout.user_id !== link.user_id) {
+      return NextResponse.json(
+        { error: "共有リンクが無効です" },
+        { status: 403 },
+      );
+    }
+    const { user_id: _u, ...safeWorkout } = workout;
+    result.workout = safeWorkout;
   }
 
   return NextResponse.json(result);

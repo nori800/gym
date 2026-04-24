@@ -88,7 +88,10 @@ export default function CaptureMetaPage() {
       .eq("user_id", user.id)
       .order("workout_date", { ascending: false })
       .limit(10)
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (error) {
+          console.error("[capture/meta] recent workouts fetch error:", error.message);
+        }
         if (data) setRecentWorkouts(data as RecentWorkout[]);
       });
   }, [user]);

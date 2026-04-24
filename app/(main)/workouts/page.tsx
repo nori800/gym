@@ -102,11 +102,14 @@ export default function WorkoutsPage() {
   const fetchVideoCounts = useCallback(async (workoutIds: string[]) => {
     if (workoutIds.length === 0) return;
     const supabase = createClient();
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("videos")
       .select("workout_id")
       .in("workout_id", workoutIds);
 
+    if (error) {
+      console.error("[workouts] video count fetch error:", error.message);
+    }
     if (!data) return;
     const counts: Record<string, number> = {};
     for (const row of data) {
@@ -356,7 +359,7 @@ function WorkoutDetailSheet({
                   <RecordDateBlock iso={entry.date} />
                   <h3 className="mt-2 text-xl font-bold tracking-tight">{entry.title}</h3>
                 </div>
-                <button type="button" onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-full text-secondary transition-all active:bg-chip active:scale-95" aria-label="閉じる">
+                <button type="button" onClick={onClose} className="flex h-11 w-11 items-center justify-center rounded-full text-secondary transition-all active:bg-chip active:scale-95" aria-label="閉じる">
                   <X size={18} strokeWidth={1.5} />
                 </button>
               </div>

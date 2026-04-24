@@ -84,12 +84,33 @@ function escapeHTML(str: string): string {
     .replace(/'/g, "&#39;");
 }
 
-function sanitizeHTMLContent(html: string): string {
+const DANGEROUS_TAGS = [
+  "script", "iframe", "object", "embed", "applet", "form",
+  "input", "textarea", "button", "select", "link", "style",
+  "base", "meta",
+];
+
+const DANGEROUS_TAG_RE = new RegExp(
+  `<\\s*/?(${DANGEROUS_TAGS.join("|")})[\\s>/][\\s\\S]*?>`,
+  "gi",
+);
+const SELF_CLOSING_DANGEROUS_RE = new RegExp(
+  `<\\s*(${DANGEROUS_TAGS.join("|")})\\b[^>]*/?>`,
+  "gi",
+);
+
+export function sanitizeHTMLContent(html: string): string {
   return html
-    .replace(/<script[\s>][\s\S]*?<\/script>/gi, "")
+    .replace(DANGEROUS_TAG_RE, "")
+    .replace(SELF_CLOSING_DANGEROUS_RE, "")
+    .replace(/<svg[\s>][\s\S]*?<\/svg>/gi, "")
     .replace(/\bon\w+\s*=\s*["'][^"']*["']/gi, "")
     .replace(/\bon\w+\s*=\s*[^\s>]+/gi, "")
-    .replace(/javascript\s*:/gi, "blocked:");
+    .replace(/javascript\s*:/gi, "blocked:")
+    .replace(/vbscript\s*:/gi, "blocked:")
+    .replace(/data\s*:\s*text\/html/gi, "blocked:")
+    .replace(/expression\s*\(/gi, "blocked(")
+    .replace(/-moz-binding\s*:/gi, "blocked:");
 }
 
 export function generatePDFHTML(title: string, content: string): string {

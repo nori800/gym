@@ -11,7 +11,7 @@ export async function middleware(request: NextRequest) {
       pathname === "/login" ||
       pathname === "/signup" ||
       pathname === "/" ||
-      pathname.startsWith("/api/");
+      pathname.startsWith("/share/");
     if (!isPublic) {
       const url = request.nextUrl.clone();
       url.pathname = "/login";
