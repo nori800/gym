@@ -21,6 +21,9 @@ interface Props {
   height: number;
 }
 
+const STROKE_W = 5;
+const MIN_DRAG = 8;
+
 let shapeId = 0;
 
 export function DrawingCanvas({ tool, color, shapes, onAdd, width, height }: Props) {
@@ -39,6 +42,7 @@ export function DrawingCanvas({ tool, color, shapes, onAdd, width, height }: Pro
 
   const handleDown = useCallback((e: React.PointerEvent) => {
     if (tool === "none") return;
+    e.preventDefault();
     const p = getPoint(e);
     setDrawing({ x1: p.x, y1: p.y, x2: p.x, y2: p.y });
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
@@ -46,6 +50,7 @@ export function DrawingCanvas({ tool, color, shapes, onAdd, width, height }: Pro
 
   const handleMove = useCallback((e: React.PointerEvent) => {
     if (!drawing) return;
+    e.preventDefault();
     const p = getPoint(e);
     setDrawing((d) => d ? { ...d, x2: p.x, y2: p.y } : null);
   }, [drawing, getPoint]);
@@ -54,7 +59,7 @@ export function DrawingCanvas({ tool, color, shapes, onAdd, width, height }: Pro
     if (!drawing || tool === "none") { setDrawing(null); return; }
     const dx = drawing.x2 - drawing.x1;
     const dy = drawing.y2 - drawing.y1;
-    if (Math.sqrt(dx * dx + dy * dy) > 5) {
+    if (Math.sqrt(dx * dx + dy * dy) > MIN_DRAG) {
       onAdd({ id: `s${++shapeId}`, tool: tool as "line" | "arrow" | "circle", ...drawing, color });
     }
     setDrawing(null);
@@ -64,19 +69,33 @@ export function DrawingCanvas({ tool, color, shapes, onAdd, width, height }: Pro
     if (tool === "none") setDrawing(null);
   }, [tool]);
 
+  const isActive = tool !== "none";
+
   return (
     <svg
       ref={svgRef}
       viewBox={`0 0 ${width} ${height}`}
-      className={`absolute inset-0 h-full w-full ${tool !== "none" ? "cursor-crosshair" : "pointer-events-none"}`}
+      className={`absolute inset-0 h-full w-full ${isActive ? "cursor-crosshair" : "pointer-events-none"}`}
+      style={isActive ? { touchAction: "none" } : undefined}
       onPointerDown={handleDown}
       onPointerMove={handleMove}
       onPointerUp={handleUp}
     >
       <defs>
-        <marker id="arrowMarker" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
-          <path d="M0,0 L8,3 L0,6 Z" fill="currentColor" />
-        </marker>
+        {/* Per-color arrow markers so the arrowhead matches the stroke color */}
+        {["#3eed8d", "#EF4444", "#3B82F6", "#FFFFFF"].map((c) => (
+          <marker
+            key={c}
+            id={`arrow-${c.replace("#", "")}`}
+            markerWidth="10"
+            markerHeight="7"
+            refX="9"
+            refY="3.5"
+            orient="auto"
+          >
+            <path d="M0,0 L10,3.5 L0,7 Z" fill={c} />
+          </marker>
+        ))}
       </defs>
 
       {shapes.map((s) => <ShapeEl key={s.id} shape={s} />)}
@@ -89,21 +108,38 @@ export function DrawingCanvas({ tool, color, shapes, onAdd, width, height }: Pro
 
 function ShapeEl({ shape, preview }: { shape: DrawShape; preview?: boolean }) {
   const o = preview ? 0.5 : 1;
+  const sw = STROKE_W;
+
   if (shape.tool === "circle") {
-    const cx = (shape.x1 + shape.x2) / 2;
-    const cy = (shape.y1 + shape.y2) / 2;
-    const rx = Math.abs(shape.x2 - shape.x1) / 2;
-    const ry = Math.abs(shape.y2 - shape.y1) / 2;
-    return <ellipse cx={cx} cy={cy} rx={rx} ry={ry} fill="none" stroke={shape.color} strokeWidth={2} opacity={o} />;
+    // Center = drag start, radius = distance to drag end
+    const cx = shape.x1;
+    const cy = shape.y1;
+    const r = Math.sqrt(
+      (shape.x2 - shape.x1) ** 2 + (shape.y2 - shape.y1) ** 2,
+    );
+    return (
+      <circle
+        cx={cx}
+        cy={cy}
+        r={Math.max(r, 1)}
+        fill="none"
+        stroke={shape.color}
+        strokeWidth={sw}
+        opacity={o}
+      />
+    );
   }
+
+  const markerId = `arrow-${shape.color.replace("#", "")}`;
+
   return (
     <line
       x1={shape.x1} y1={shape.y1} x2={shape.x2} y2={shape.y2}
       stroke={shape.color}
-      strokeWidth={2}
+      strokeWidth={sw}
+      strokeLinecap="round"
       opacity={o}
-      markerEnd={shape.tool === "arrow" ? "url(#arrowMarker)" : undefined}
-      style={{ color: shape.color }}
+      markerEnd={shape.tool === "arrow" ? `url(#${markerId})` : undefined}
     />
   );
 }

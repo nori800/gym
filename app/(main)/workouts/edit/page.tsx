@@ -89,7 +89,6 @@ function WorkoutEditInner() {
   const [showAddToast, setShowAddToast] = useState(false);
   const [hasAddedMovement, setHasAddedMovement] = useState(false);
   const [transitionKey, setTransitionKey] = useState(0);
-  const [titleEditing, setTitleEditing] = useState(false);
   const [blockExplainerOpen, setBlockExplainerOpen] = useState(false);
 
   useEffect(() => {
@@ -394,32 +393,23 @@ function WorkoutEditInner() {
           </div>
         </div>
 
-        {/* Title — editable on tap */}
+        {/* Title */}
         <div className="mt-6">
           <p className="text-xs font-title uppercase tracking-[0.12em] text-muted">
             {editId ? "Edit Workout" : "Workout"}
           </p>
-          {titleEditing ? (
+          <div className="mt-1.5 flex items-center gap-2 rounded-xl border border-border bg-white px-4 py-2.5 shadow-[0_0_0_1px_rgba(0,0,0,.03)] transition-colors focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/10">
             <input
-              autoFocus
               value={draft.title}
               onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
-              onBlur={() => setTitleEditing(false)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") setTitleEditing(false);
+              onFocus={(e) => {
+                if (e.target.value === "マイワークアウト") e.target.select();
               }}
-              className="mt-1.5 w-full border-b border-primary/20 bg-transparent pb-1 text-[26px] font-bold tracking-tight text-primary outline-none"
+              placeholder="ワークアウト名を入力"
+              className="min-w-0 flex-1 bg-transparent text-[22px] font-bold tracking-tight text-primary placeholder:text-muted/40 outline-none"
             />
-          ) : (
-            <button
-              type="button"
-              onClick={() => setTitleEditing(true)}
-              className="mt-1.5 flex w-full items-center gap-2 text-left"
-            >
-              <h1 className="text-[26px] font-bold tracking-tight">{draft.title}</h1>
-              <Pencil size={14} strokeWidth={2} className="shrink-0 text-muted" />
-            </button>
-          )}
+            <Pencil size={14} strokeWidth={2} className="shrink-0 text-muted/50" />
+          </div>
           <p className="mt-2 text-sm text-secondary">
             {totalMovements > 0
               ? `${draft.blocks.length}ブロック · ${totalMovements}種目`
