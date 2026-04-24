@@ -6,7 +6,7 @@ import Link from "next/link";
 import {
   ArrowLeft, Play, Pause, SkipBack, SkipForward,
   Pencil, Layers, ChevronDown, ChevronUp, Loader2,
-  Trash2, ChevronLeft, ChevronRight,
+  Trash2, ChevronLeft, ChevronRight, Link2,
 } from "lucide-react";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useToast } from "@/lib/hooks/useToast";
@@ -77,6 +77,7 @@ export default function VideoDetailPage() {
   const [pendingWorkoutId, setPendingWorkoutId] = useState("");
   const [linkSaving, setLinkSaving] = useState(false);
 
+  const [linkOpen, setLinkOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [annotationId, setAnnotationId] = useState<string | null>(null);
   const [annotationSaving, setAnnotationSaving] = useState(false);
@@ -587,38 +588,6 @@ export default function VideoDetailPage() {
 
       {/* Controls area */}
       <div className="shrink-0 bg-white px-4 pb-[max(1.25rem,calc(0.75rem+env(safe-area-inset-bottom,0px)))] pt-3">
-        {/* Workout link section */}
-        <div className="mb-3 overflow-hidden rounded-[14px] border border-border bg-surface px-3 py-3 shadow-[0_0_0_1px_rgba(0,0,0,.03)]">
-          <p className="text-[10px] font-title uppercase tracking-[0.12em] text-muted">ワークアウト</p>
-          <p className="mt-1 text-[12px] leading-relaxed text-secondary">
-            履歴のセッションにこの動画を紐付けます
-          </p>
-          <select
-            value={pendingWorkoutId}
-            onChange={(e) => setPendingWorkoutId(e.target.value)}
-            aria-label="紐付けるワークアウト"
-            className="mt-2 min-h-[44px] w-full rounded-lg border border-border bg-white px-3 text-sm font-semibold text-primary focus:outline-none focus:ring-2 focus:ring-primary/10"
-          >
-            <option value="">紐付けなし</option>
-            {recentWorkouts.map((w) => (
-              <option key={w.id} value={w.id}>
-                {w.title}（{w.workout_date}）
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            onClick={handleLinkWorkout}
-            disabled={
-              linkSaving || pendingWorkoutId === (video.workout_session_id ?? "")
-            }
-            className="mt-2 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-inverse text-sm font-extrabold tracking-wide text-on-inverse transition-all duration-150 active:scale-[0.98] disabled:opacity-40"
-          >
-            {linkSaving && <Loader2 size={16} className="animate-spin" />}
-            ワークアウトに登録
-          </button>
-        </div>
-
         {/* Seek bar */}
         <div className="mb-2 flex items-center gap-2">
           <span className="w-9 text-right text-[10px] font-metric text-muted">{fmtTime(currentTime)}</span>
@@ -729,6 +698,16 @@ export default function VideoDetailPage() {
             {memoOpen ? <ChevronUp size={13} strokeWidth={1.5} /> : <ChevronDown size={13} strokeWidth={1.5} />}
             メモ
           </button>
+          <button
+            type="button"
+            onClick={() => setLinkOpen(!linkOpen)}
+            className={`flex items-center gap-1 rounded-md px-3 py-1.5 text-[11px] transition-colors ${
+              linkOpen ? "bg-surface text-primary" : "text-muted"
+            }`}
+          >
+            <Link2 size={13} strokeWidth={1.5} />
+            紐付け
+          </button>
         </div>
 
         {panel === "overlay" && (
@@ -795,6 +774,38 @@ export default function VideoDetailPage() {
             >
               {memoSaving && <Loader2 size={16} className="animate-spin" />}
               保存
+            </button>
+          </div>
+        )}
+
+        {linkOpen && (
+          <div className="mt-2 overflow-hidden rounded-[14px] border border-border bg-surface px-3 py-3">
+            <p className="text-[12px] leading-relaxed text-secondary">
+              {linkedWorkoutTitle
+                ? `現在「${linkedWorkoutTitle}」に紐付け中`
+                : "履歴のセッションにこの動画を紐付けます"}
+            </p>
+            <select
+              value={pendingWorkoutId}
+              onChange={(e) => setPendingWorkoutId(e.target.value)}
+              aria-label="紐付けるワークアウト"
+              className="mt-2 min-h-[40px] w-full rounded-lg border border-border bg-white px-3 text-sm font-semibold text-primary focus:outline-none focus:ring-2 focus:ring-primary/10"
+            >
+              <option value="">紐付けなし</option>
+              {recentWorkouts.map((w) => (
+                <option key={w.id} value={w.id}>
+                  {w.title}（{w.workout_date}）
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={handleLinkWorkout}
+              disabled={linkSaving || pendingWorkoutId === (video.workout_session_id ?? "")}
+              className="mt-2 flex min-h-[40px] w-full items-center justify-center gap-2 rounded-xl bg-inverse text-sm font-extrabold tracking-wide text-on-inverse transition-all duration-150 active:scale-[0.98] disabled:opacity-40"
+            >
+              {linkSaving && <Loader2 size={16} className="animate-spin" />}
+              ワークアウトに登録
             </button>
           </div>
         )}

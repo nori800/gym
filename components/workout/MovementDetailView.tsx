@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowLeft, ChevronDown, ChevronUp, HelpCircle } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronUp, HelpCircle, Loader2 } from "lucide-react";
 import type { Movement, MovementConfig, WeightMode, AssistanceType } from "@/types/workout";
 import { WEIGHT_MODES, ASSISTANCE_TYPES } from "@/types/workout";
 import { Toggle } from "./Toggle";
@@ -15,6 +15,8 @@ interface MovementDetailViewProps {
   onConfigChange: (config: MovementConfig) => void;
   onAdd: () => void;
   onBack: () => void;
+  onAddAndSave?: () => void;
+  saving?: boolean;
 }
 
 const MUSCLE_MAP: Record<string, string[]> = {
@@ -31,6 +33,8 @@ export function MovementDetailView({
   onConfigChange,
   onAdd,
   onBack,
+  onAddAndSave,
+  saving,
 }: MovementDetailViewProps) {
   const [segment, setSegment] = useState<Segment>("overview");
   const [setsExpanded, setSetsExpanded] = useState(true);
@@ -438,13 +442,28 @@ export function MovementDetailView({
       </div>
 
       {/* Fixed CTA */}
-      <div className="shrink-0 px-[22px] pb-[max(1.5rem,calc(0.75rem+env(safe-area-inset-bottom,0px)))] pt-3">
+      <div className="shrink-0 space-y-2 px-[22px] pb-[max(1.5rem,calc(0.75rem+env(safe-area-inset-bottom,0px)))] pt-3">
+        {onAddAndSave && (
+          <button
+            type="button"
+            onClick={onAddAndSave}
+            disabled={saving}
+            className="flex h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-inverse text-base font-extrabold tracking-wide text-on-inverse shadow-[0_4px_16px_rgba(0,0,0,0.12)] transition-all duration-200 active:scale-[0.98] active:shadow-[0_2px_8px_rgba(0,0,0,0.1)] disabled:opacity-60"
+          >
+            {saving && <Loader2 size={16} className="animate-spin" />}
+            追加して保存
+          </button>
+        )}
         <button
           type="button"
           onClick={onAdd}
-          className="flex h-[52px] w-full items-center justify-center rounded-xl bg-inverse text-base font-extrabold tracking-wide text-on-inverse shadow-[0_4px_16px_rgba(0,0,0,0.12)] transition-all duration-200 active:scale-[0.98] active:shadow-[0_2px_8px_rgba(0,0,0,0.1)]"
+          className={`flex h-[52px] w-full items-center justify-center rounded-xl text-base font-extrabold tracking-wide transition-all duration-200 active:scale-[0.98] ${
+            onAddAndSave
+              ? "border border-border bg-white text-primary shadow-[0_0_0_1px_rgba(0,0,0,.04)]"
+              : "bg-inverse text-on-inverse shadow-[0_4px_16px_rgba(0,0,0,0.12)] active:shadow-[0_2px_8px_rgba(0,0,0,0.1)]"
+          }`}
         >
-          この種目を追加
+          追加だけ（あとで保存）
         </button>
       </div>
     </div>

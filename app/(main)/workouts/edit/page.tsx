@@ -154,7 +154,7 @@ function WorkoutEditInner() {
     [navigate],
   );
 
-  const handleAddMovement = useCallback(() => {
+  const addMovementToDraft = useCallback(() => {
     if (!currentConfig) return;
     setDraft((prev) => {
       const blocks = [...prev.blocks];
@@ -164,11 +164,100 @@ function WorkoutEditInner() {
       return { ...prev, blocks };
     });
     setHasAddedMovement(true);
+  }, [currentConfig, activeBlockIndex]);
+
+  const handleAddMovement = useCallback(() => {
+    addMovementToDraft();
     navigate({ screen: "editor" }, "back");
     setSelectedMovementId(null);
     setCurrentConfig(null);
     setTimeout(() => setShowAddToast(true), 300);
-  }, [currentConfig, activeBlockIndex, navigate]);
+  }, [addMovementToDraft, navigate]);
+
+  const handleAddAndSave = useCallback(async () => {
+    if (!currentConfig) return;
+
+    const updatedBlocks = [...draft.blocks];
+    const block = { ...updatedBlocks[activeBlockIndex] };
+    block.movements = [...block.movements, currentConfig];
+    updatedBlocks[activeBlockIndex] = block;
+
+    setDraft((prev) => ({ ...prev, blocks: updatedBlocks }));
+    setHasAddedMovement(true);
+    setSelectedMovementId(null);
+    setCurrentConfig(null);
+
+    if (!user) {
+      showToast("ログインするとワークアウトを保存できます", "info");
+      navigate({ screen: "editor" }, "back");
+      return;
+    }
+
+    setSaving(true);
+    const supabase = createClient();
+
+    const allMovements = updatedBlocks.flatMap((b) => b.movements);
+    const totalSets = allMovements.reduce((s, m) => s + m.sets, 0);
+    const totalVolume = allMovements.reduce((s, m) => {
+      const avgWeight = m.perSetWeight.length > 0
+        ? m.perSetWeight.reduce((a, w) => a + w, 0) / m.perSetWeight.length
+        : 0;
+      return s + avgWeight * m.reps * m.sets;
+    }, 0);
+    const categories = [...new Set(
+      allMovements
+        .map((m) => getMovementById(m.movementId)?.categoryJa)
+        .filter((c): c is string => !!c),
+    )];
+    const blocksJson = updatedBlocks.map((b) => ({
+      name: b.name,
+      movements: b.movements.map((m) => {
+        const mv = getMovementById(m.movementId);
+        return {
+          movementId: m.movementId,
+          nameJa: mv?.nameJa ?? "",
+          categoryJa: mv?.categoryJa ?? "",
+          sets: m.sets,
+          reps: m.reps,
+          weight: m.perSetWeight[0] ?? 0,
+          perSetWeight: m.perSetWeight,
+          perSetReps: m.perSetReps,
+          weightMode: m.weightMode,
+          assistance: m.assistanceType,
+        };
+      }),
+    }));
+
+    const payload = {
+      user_id: user.id,
+      title: draft.title,
+      workout_date: draft.date,
+      description: draft.description,
+      blocks_json: blocksJson as Json,
+      total_sets: totalSets,
+      total_volume: totalVolume,
+      categories,
+      duration_min: null,
+    };
+
+    let error;
+    if (editId) {
+      ({ error } = await supabase.from("workouts").update(payload).eq("id", editId));
+    } else {
+      ({ error } = await supabase.from("workouts").insert(payload));
+    }
+
+    setSaving(false);
+
+    if (error) {
+      showToast("保存に失敗しました: " + error.message, "error");
+      navigate({ screen: "editor" }, "back");
+      return;
+    }
+
+    showToast(editId ? "ワークアウトを更新しました" : "ワークアウトを保存しました", "success");
+    setTimeout(() => router.push("/workouts"), 600);
+  }, [currentConfig, activeBlockIndex, draft, user, editId, router, navigate, showToast]);
 
   const handleAddBlock = useCallback(() => {
     setDraft((prev) => ({
@@ -404,6 +493,8 @@ function WorkoutEditInner() {
           onConfigChange={setCurrentConfig}
           onAdd={handleAddMovement}
           onBack={() => navigate({ screen: "list" }, "back")}
+          onAddAndSave={handleAddAndSave}
+          saving={saving}
         />
       </div>
     );
@@ -425,15 +516,7 @@ function WorkoutEditInner() {
           >
             <X size={20} strokeWidth={1.5} />
           </button>
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving}
-            className="flex items-center gap-2 rounded-xl bg-inverse px-5 py-2.5 text-sm font-extrabold tracking-wide text-on-inverse transition-all duration-150 active:scale-[0.97] disabled:opacity-60"
-          >
-            {saving && <Loader2 size={14} className="animate-spin" />}
-            {editId ? "更新" : "保存"}
-          </button>
+          <div className="h-10 w-10" />
         </div>
 
         {/* Title */}
@@ -547,16 +630,6 @@ function WorkoutEditInner() {
           </>
         )}
 
-        {/* Bottom save button — always visible */}
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={saving}
-          className="mt-6 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-inverse text-base font-extrabold tracking-wide text-on-inverse shadow-lg transition-all duration-150 active:scale-[0.97] disabled:opacity-60"
-        >
-          {saving && <Loader2 size={16} className="animate-spin" />}
-          {editId ? "ワークアウトを更新" : "ワークアウトを保存"}
-        </button>
       </div>
 
       {/* Template picker modal */}
