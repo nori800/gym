@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { User } from "@supabase/supabase-js";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -47,21 +48,32 @@ export async function GET(request: NextRequest) {
   const isEmail = query.includes("@");
 
   if (isEmail) {
-    const { data: authUsers, error: authErr } = await admin.auth.admin.listUsers({
-      perPage: 10,
-    });
+    const matched: User[] = [];
+    const normalizedQuery = query.toLowerCase();
+    const perPage = 100;
 
-    if (authErr) {
-      console.error("[search-member] auth listUsers error:", authErr.message);
-      return NextResponse.json(
-        { error: "ユーザー検索に失敗しました" },
-        { status: 500 },
+    for (let page = 1; page <= 10 && matched.length < 20; page += 1) {
+      const { data: authUsers, error: authErr } = await admin.auth.admin.listUsers({
+        page,
+        perPage,
+      });
+
+      if (authErr) {
+        console.error("[search-member] auth listUsers error:", authErr.message);
+        return NextResponse.json(
+          { error: "ユーザー検索に失敗しました" },
+          { status: 500 },
+        );
+      }
+
+      matched.push(
+        ...authUsers.users.filter(
+          (u) => u.email && u.email.toLowerCase().includes(normalizedQuery),
+        ),
       );
-    }
 
-    const matched = authUsers.users.filter(
-      (u) => u.email && u.email.toLowerCase().includes(query.toLowerCase()),
-    );
+      if (authUsers.users.length < perPage) break;
+    }
 
     if (matched.length === 0) {
       return NextResponse.json({ results: [] });
@@ -71,7 +83,7 @@ export async function GET(request: NextRequest) {
 
     const { data: profiles, error: profileErr } = await admin
       .from("profiles")
-      .select("id, user_id, display_name, trainer_id")
+      .select("id, user_id, display_name, trainer_id, role")
       .in("user_id", matchedIds);
 
     if (profileErr) {
@@ -93,17 +105,19 @@ export async function GET(request: NextRequest) {
           : null,
         has_trainer: !!p.trainer_id,
         is_self: p.user_id === user.id,
+        is_trainer: p.role === "trainer",
       };
-    });
+    }).sort(compareSearchResults);
 
     return NextResponse.json({ results });
   }
 
-  const { data: profiles, error: profileErr } = await supabase
+  const { data: profiles, error: profileErr } = await admin
     .from("profiles")
-    .select("id, user_id, display_name, trainer_id")
+    .select("id, user_id, display_name, trainer_id, role")
     .ilike("display_name", `%${query}%`)
-    .limit(10);
+    .order("display_name", { ascending: true })
+    .limit(30);
 
   if (profileErr) {
     console.error("[search-member] profile search error:", profileErr.message);
@@ -113,14 +127,18 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const results = (profiles ?? []).map((p) => ({
-    id: p.id,
-    user_id: p.user_id,
-    display_name: p.display_name || "名前未設定",
-    email_hint: null,
-    has_trainer: !!p.trainer_id,
-    is_self: p.user_id === user.id,
-  }));
+  const results = (profiles ?? [])
+    .map((p) => ({
+      id: p.id,
+      user_id: p.user_id,
+      display_name: p.display_name || "名前未設定",
+      email_hint: null,
+      has_trainer: !!p.trainer_id,
+      is_self: p.user_id === user.id,
+      is_trainer: p.role === "trainer",
+    }))
+    .sort(compareSearchResults)
+    .slice(0, 10);
 
   return NextResponse.json({ results });
 }
@@ -130,4 +148,14 @@ function maskEmail(email: string): string {
   if (!local || !domain) return "***";
   const visible = local.slice(0, 2);
   return `${visible}***@${domain}`;
+}
+
+function compareSearchResults(
+  a: { display_name: string },
+  b: { display_name: string },
+) {
+  return a.display_name.localeCompare(b.display_name, "ja", {
+    sensitivity: "base",
+    numeric: true,
+  });
 }

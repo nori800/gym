@@ -479,37 +479,21 @@ export default function DashboardPage() {
             </Link>
           )}
 
-          {/* Trainer's own stats - compact */}
-          <section className="space-y-3">
-            <h2 className="px-0.5 text-xs font-title uppercase tracking-[0.12em] text-muted">
-              自分のトレーニング
-            </h2>
-            <div className="grid grid-cols-3 gap-2.5">
-              <div className="flex flex-col justify-center rounded-[14px] bg-white p-3 shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
-                <p className="text-[10px] font-title uppercase tracking-[0.12em] text-muted">今週</p>
-                <p className="mt-1 flex items-baseline gap-0.5">
-                  <span className="text-lg font-metric leading-none">{data.weekSessions}</span>
-                  <span className="text-[10px] font-caption text-muted">回</span>
-                </p>
-              </div>
-              <div className="flex flex-col justify-center rounded-[14px] bg-white p-3 shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
-                <p className="text-[10px] font-title uppercase tracking-[0.12em] text-muted">体重</p>
-                <p className="mt-1 flex items-baseline gap-0.5">
-                  <span className="text-lg font-metric leading-none">
-                    {data.latestWeight?.weight ?? "—"}
-                  </span>
-                  <span className="text-[10px] font-caption text-muted">kg</span>
-                </p>
-              </div>
-              <div className="flex flex-col justify-center rounded-[14px] bg-white p-3 shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
-                <p className="text-[10px] font-title uppercase tracking-[0.12em] text-muted">動画</p>
-                <p className="mt-1 flex items-baseline gap-0.5">
-                  <span className="text-lg font-metric leading-none">{data.videoCount}</span>
-                  <span className="text-[10px] font-caption text-muted">本</span>
-                </p>
-              </div>
+          <Link
+            href="/trainer/register"
+            className="flex items-center gap-3.5 rounded-[18px] bg-accent/10 px-[18px] py-4 transition-all active:scale-[0.99]"
+          >
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-white">
+              <Users size={18} strokeWidth={1.5} className="text-primary" />
             </div>
-          </section>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold tracking-tight">会員を登録する</p>
+              <p className="mt-0.5 text-xs text-secondary">
+                検索画面とは別に、連絡先や入会日を登録できます
+              </p>
+            </div>
+            <ChevronRight size={16} strokeWidth={1.5} className="shrink-0 text-muted" />
+          </Link>
         </>
       )}
 

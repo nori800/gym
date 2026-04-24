@@ -5,10 +5,15 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft,
+  CalendarDays,
+  ClipboardList,
   Film,
   Dumbbell,
+  MapPin,
+  Phone,
   Scale,
   Loader2,
+  Save,
   UserMinus,
   Video as VideoIcon,
 } from "lucide-react";
@@ -24,9 +29,22 @@ type Tab = "videos" | "workouts" | "body";
 type MemberInfo = {
   profileId: string;
   displayName: string;
+  phoneNumber: string | null;
+  address: string | null;
+  joinedOn: string | null;
+  trainerMemo: string | null;
+  membershipDays: number | null;
   weight: number | null;
   workoutCount: number;
   videoCount: number;
+};
+
+type MemberManagementForm = {
+  displayName: string;
+  phoneNumber: string;
+  address: string;
+  joinedOn: string;
+  trainerMemo: string;
 };
 
 type VideoItem = {
@@ -52,6 +70,36 @@ type BodyLogItem = {
   body_fat_pct: number | null;
 };
 
+const EMPTY_MANAGEMENT_FORM: MemberManagementForm = {
+  displayName: "",
+  phoneNumber: "",
+  address: "",
+  joinedOn: "",
+  trainerMemo: "",
+};
+
+function getMembershipDays(joinedOn: string | null): number | null {
+  if (!joinedOn) return null;
+  const joined = new Date(`${joinedOn}T00:00:00`);
+  if (Number.isNaN(joined.getTime())) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.max(
+    1,
+    Math.floor((today.getTime() - joined.getTime()) / 86400000) + 1,
+  );
+}
+
+function toManagementForm(info: MemberInfo): MemberManagementForm {
+  return {
+    displayName: info.displayName,
+    phoneNumber: info.phoneNumber ?? "",
+    address: info.address ?? "",
+    joinedOn: info.joinedOn ?? "",
+    trainerMemo: info.trainerMemo ?? "",
+  };
+}
+
 export default function MemberHubPage() {
   const params = useParams();
   const userId = params.userId as string;
@@ -61,6 +109,9 @@ export default function MemberHubPage() {
 
   const [tab, setTab] = useState<Tab>("videos");
   const [memberInfo, setMemberInfo] = useState<MemberInfo | null>(null);
+  const [managementForm, setManagementForm] = useState<MemberManagementForm>(
+    EMPTY_MANAGEMENT_FORM,
+  );
   const [loading, setLoading] = useState(true);
   const [accessError, setAccessError] = useState<string | null>(null);
 
@@ -72,6 +123,7 @@ export default function MemberHubPage() {
 
   const [showRemoveModal, setShowRemoveModal] = useState(false);
   const [removing, setRemoving] = useState(false);
+  const [savingManagement, setSavingManagement] = useState(false);
 
   const fetchMemberInfo = useCallback(async () => {
     if (!user) return;
@@ -91,7 +143,9 @@ export default function MemberHubPage() {
 
     const { data: profile, error } = await supabase
       .from("profiles")
-      .select("id, display_name, weight")
+      .select(
+        "id, display_name, phone_number, address, joined_on, trainer_memo, weight",
+      )
       .eq("user_id", userId)
       .eq("trainer_id", user.id)
       .single();
@@ -113,13 +167,21 @@ export default function MemberHubPage() {
         .eq("user_id", userId),
     ]);
 
-    setMemberInfo({
+    const nextInfo: MemberInfo = {
       profileId: profile.id,
       displayName: profile.display_name || "名前未設定",
+      phoneNumber: profile.phone_number,
+      address: profile.address,
+      joinedOn: profile.joined_on,
+      trainerMemo: profile.trainer_memo,
+      membershipDays: getMembershipDays(profile.joined_on),
       weight: profile.weight,
       workoutCount: woRes.count ?? 0,
       videoCount: vidRes.count ?? 0,
-    });
+    };
+
+    setMemberInfo(nextInfo);
+    setManagementForm(toManagementForm(nextInfo));
     setLoading(false);
   }, [user, userId]);
 
@@ -175,6 +237,52 @@ export default function MemberHubPage() {
       fetchTabData(tab);
     }
   }, [memberInfo, tab, fetchTabData]);
+
+  const handleSaveManagement = useCallback(async () => {
+    if (!memberInfo) return;
+    if (!managementForm.displayName.trim()) {
+      show("会員名を入力してください", "error");
+      return;
+    }
+
+    setSavingManagement(true);
+    try {
+      const res = await fetch(`/api/trainer/members/${encodeURIComponent(userId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          displayName: managementForm.displayName,
+          phoneNumber: managementForm.phoneNumber,
+          address: managementForm.address,
+          joinedOn: managementForm.joinedOn,
+          trainerMemo: managementForm.trainerMemo,
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        show(data.error || "会員情報の保存に失敗しました", "error");
+        return;
+      }
+
+      const nextInfo: MemberInfo = {
+        ...memberInfo,
+        displayName: managementForm.displayName.trim(),
+        phoneNumber: managementForm.phoneNumber.trim() || null,
+        address: managementForm.address.trim() || null,
+        joinedOn: managementForm.joinedOn || null,
+        trainerMemo: managementForm.trainerMemo.trim() || null,
+        membershipDays: getMembershipDays(managementForm.joinedOn || null),
+      };
+      setMemberInfo(nextInfo);
+      setManagementForm(toManagementForm(nextInfo));
+      show("会員情報を保存しました", "success");
+    } catch {
+      show("会員情報の保存に失敗しました", "error");
+    } finally {
+      setSavingManagement(false);
+    }
+  }, [managementForm, memberInfo, show, userId]);
 
   const handleRemove = useCallback(async () => {
     if (!user || !memberInfo) return;
@@ -280,6 +388,128 @@ export default function MemberHubPage() {
           </div>
         </div>
       </header>
+
+      <section className="rounded-[18px] bg-white p-[18px] shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-accent/10">
+            <ClipboardList size={18} strokeWidth={1.5} className="text-primary" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-bold tracking-tight">管理情報</p>
+            <p className="mt-0.5 text-xs text-secondary">
+              連絡先・入会日・メモをトレーナー用に管理します
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-4 space-y-3.5">
+          <label className="block">
+            <span className="text-xs font-bold text-secondary">会員名</span>
+            <input
+              type="text"
+              value={managementForm.displayName}
+              onChange={(e) =>
+                setManagementForm((prev) => ({
+                  ...prev,
+                  displayName: e.target.value,
+                }))
+              }
+              className="mt-1.5 min-h-[44px] w-full rounded-xl border border-border bg-surface px-3.5 text-sm outline-none transition-colors focus:border-primary/30 focus:ring-2 focus:ring-primary/10"
+            />
+          </label>
+
+          <div className="grid grid-cols-1 gap-3">
+            <label className="block">
+              <span className="flex items-center gap-1 text-xs font-bold text-secondary">
+                <Phone size={12} strokeWidth={1.7} />
+                電話番号
+              </span>
+              <input
+                type="tel"
+                value={managementForm.phoneNumber}
+                onChange={(e) =>
+                  setManagementForm((prev) => ({
+                    ...prev,
+                    phoneNumber: e.target.value,
+                  }))
+                }
+                className="mt-1.5 min-h-[44px] w-full rounded-xl border border-border bg-surface px-3.5 text-sm outline-none transition-colors focus:border-primary/30 focus:ring-2 focus:ring-primary/10"
+              />
+            </label>
+
+            <label className="block">
+              <span className="flex items-center gap-1 text-xs font-bold text-secondary">
+                <CalendarDays size={12} strokeWidth={1.7} />
+                入会日
+              </span>
+              <input
+                type="date"
+                value={managementForm.joinedOn}
+                onChange={(e) =>
+                  setManagementForm((prev) => ({
+                    ...prev,
+                    joinedOn: e.target.value,
+                  }))
+                }
+                className="mt-1.5 min-h-[44px] w-full rounded-xl border border-border bg-surface px-3.5 text-sm outline-none transition-colors focus:border-primary/30 focus:ring-2 focus:ring-primary/10"
+              />
+              {memberInfo.membershipDays != null && (
+                <span className="mt-1.5 block text-xs font-bold text-primary">
+                  継続 {memberInfo.membershipDays} 日
+                </span>
+              )}
+            </label>
+          </div>
+
+          <label className="block">
+            <span className="flex items-center gap-1 text-xs font-bold text-secondary">
+              <MapPin size={12} strokeWidth={1.7} />
+              住所
+            </span>
+            <textarea
+              value={managementForm.address}
+              onChange={(e) =>
+                setManagementForm((prev) => ({
+                  ...prev,
+                  address: e.target.value,
+                }))
+              }
+              rows={2}
+              className="mt-1.5 w-full rounded-xl border border-border bg-surface px-3.5 py-3 text-sm outline-none transition-colors focus:border-primary/30 focus:ring-2 focus:ring-primary/10"
+            />
+          </label>
+
+          <label className="block">
+            <span className="text-xs font-bold text-secondary">トレーナーメモ</span>
+            <textarea
+              value={managementForm.trainerMemo}
+              onChange={(e) =>
+                setManagementForm((prev) => ({
+                  ...prev,
+                  trainerMemo: e.target.value,
+                }))
+              }
+              rows={3}
+              placeholder="目標、注意点、次回確認したいことなど"
+              className="mt-1.5 w-full rounded-xl border border-border bg-surface px-3.5 py-3 text-sm outline-none transition-colors focus:border-primary/30 focus:ring-2 focus:ring-primary/10"
+            />
+          </label>
+
+          <button
+            type="button"
+            onClick={handleSaveManagement}
+            disabled={savingManagement || !managementForm.displayName.trim()}
+            className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-inverse text-sm font-extrabold text-on-inverse transition-all active:scale-[0.98] disabled:opacity-50"
+          >
+            {savingManagement ? (
+              <Loader2 size={15} className="animate-spin" />
+            ) : (
+              <Save size={15} strokeWidth={2} />
+            )}
+            管理情報を保存
+          </button>
+        </div>
+      </section>
 
       {/* Tab navigation */}
       <nav className="flex rounded-xl bg-chip p-1">

@@ -8,6 +8,10 @@ export interface Database {
           id: string;
           user_id: string;
           display_name: string;
+          address: string | null;
+          phone_number: string | null;
+          joined_on: string | null;
+          trainer_memo: string | null;
           height: number | null;
           weight: number | null;
           goal: string | null;
@@ -22,6 +26,10 @@ export interface Database {
           id?: string;
           user_id: string;
           display_name?: string;
+          address?: string | null;
+          phone_number?: string | null;
+          joined_on?: string | null;
+          trainer_memo?: string | null;
           height?: number | null;
           weight?: number | null;
           goal?: string | null;
@@ -36,6 +44,10 @@ export interface Database {
           id?: string;
           user_id?: string;
           display_name?: string;
+          address?: string | null;
+          phone_number?: string | null;
+          joined_on?: string | null;
+          trainer_memo?: string | null;
           height?: number | null;
           weight?: number | null;
           goal?: string | null;
