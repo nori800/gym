@@ -49,9 +49,11 @@ type BodyDetailProps = {
   logs: BodyLog[];
   onEdit?: (log: BodyLog) => void;
   onDelete?: (log: BodyLog) => void;
+  /** メンバー閲覧など、編集 UI を出さないモード */
+  viewOnly?: boolean;
 };
 
-export function BodyDetail({ logs, onEdit, onDelete }: BodyDetailProps) {
+export function BodyDetail({ logs, onEdit, onDelete, viewOnly }: BodyDetailProps) {
   const [range, setRange] = useState<Range>("month");
   const data = useMemo(() => filterByRange(logs, range), [logs, range]);
 
@@ -63,7 +65,7 @@ export function BodyDetail({ logs, onEdit, onDelete }: BodyDetailProps) {
         </div>
         <p className="mt-5 text-[15px] font-bold">この期間のデータがありません</p>
         <p className="mt-2 text-center text-sm text-secondary">
-          右下のボタンから記録を追加できます
+          {viewOnly ? "この期間に記録がまだありません。" : "右下のボタンから記録を追加できます"}
         </p>
       </div>
     );

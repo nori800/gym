@@ -8,6 +8,7 @@ import { EXERCISE_TYPES } from "@/lib/data/exercises";
 import { formatDate } from "@/lib/utils/formatDate";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { createClient } from "@/lib/supabase/client";
+import { validateMemberForTrainer } from "@/lib/trainer/validateMemberForTrainer";
 import type { Video } from "@/types";
 
 type SortKey = "newest" | "oldest";
@@ -15,6 +16,7 @@ type SortKey = "newest" | "oldest";
 function VideosPageInner() {
   const searchParams = useSearchParams();
   const sessionFilter = searchParams.get("session");
+  const memberParam = searchParams.get("member");
   const { user, loading: authLoading } = useAuth();
 
   const [videos, setVideos] = useState<Video[]>([]);
@@ -24,46 +26,86 @@ function VideosPageInner() {
   const [sort, setSort] = useState<SortKey>("newest");
   const [sessionTitle, setSessionTitle] = useState<string | null>(null);
   const [compareSelection, setCompareSelection] = useState<string[]>([]);
+  const [trainerMemberLabel, setTrainerMemberLabel] = useState<string | null>(null);
+  const [trainerMemberUserId, setTrainerMemberUserId] = useState<string | null>(null);
 
   useEffect(() => {
     if (authLoading) return;
     if (!user) {
       setVideos([]);
+      setTrainerMemberLabel(null);
+      setTrainerMemberUserId(null);
       setLoading(false);
       return;
     }
-    const supabase = createClient();
-    setFetchError(null);
-    supabase
-      .from("videos")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .then(({ data, error }) => {
-        if (error) {
-          setFetchError("動画の取得に失敗しました。再読み込みしてください。");
+
+    let cancelled = false;
+
+    async function load() {
+      const trainerUser = user;
+      if (!trainerUser) return;
+      setLoading(true);
+      setFetchError(null);
+      const supabase = createClient();
+      let targetUserId = trainerUser.id;
+      setTrainerMemberLabel(null);
+      setTrainerMemberUserId(null);
+
+      if (memberParam) {
+        const access = await validateMemberForTrainer(supabase, trainerUser.id, memberParam);
+        if (cancelled) return;
+        if (!access.ok) {
+          const msg =
+            access.reason === "not_trainer"
+              ? "メンバーの動画を表示するには、トレーナーアカウントでログインしてください。"
+              : "このメンバーの動画を表示する権限がありません。";
+          setFetchError(msg);
+          setVideos([]);
           setLoading(false);
           return;
         }
-        setVideos(
-          (data ?? []).map((v) => ({
-            id: v.id,
-            user_id: v.user_id,
-            title: v.title,
-            exercise_type: v.exercise_type,
-            shot_date: v.shot_date ?? "",
-            file_path: v.file_path,
-            thumbnail_path: v.thumbnail_path,
-            duration: v.duration,
-            memo: v.memo ?? "",
-            workout_session_id: v.workout_id,
-            created_at: v.created_at,
-            updated_at: v.updated_at,
-          })),
-        );
+        targetUserId = access.memberUserId;
+        setTrainerMemberLabel(access.displayName);
+        setTrainerMemberUserId(access.memberUserId);
+      }
+
+      const { data, error } = await supabase
+        .from("videos")
+        .select("*")
+        .eq("user_id", targetUserId)
+        .order("created_at", { ascending: false });
+
+      if (cancelled) return;
+      if (error) {
+        setFetchError("動画の取得に失敗しました。再読み込みしてください。");
+        setVideos([]);
         setLoading(false);
-      });
-  }, [user, authLoading]);
+        return;
+      }
+      setVideos(
+        (data ?? []).map((v) => ({
+          id: v.id,
+          user_id: v.user_id,
+          title: v.title,
+          exercise_type: v.exercise_type,
+          shot_date: v.shot_date ?? "",
+          file_path: v.file_path,
+          thumbnail_path: v.thumbnail_path,
+          duration: v.duration,
+          memo: v.memo ?? "",
+          workout_session_id: v.workout_id,
+          created_at: v.created_at,
+          updated_at: v.updated_at,
+        })),
+      );
+      setLoading(false);
+    }
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, authLoading, memberParam]);
 
   useEffect(() => {
     if (!sessionFilter || !user) {
@@ -76,8 +118,9 @@ function VideosPageInner() {
       .select("title")
       .eq("id", sessionFilter)
       .single()
-      .then(({ data }) => {
-        setSessionTitle(data?.title ?? null);
+      .then(({ data, error }) => {
+        if (error) setSessionTitle(null);
+        else setSessionTitle(data?.title ?? null);
       });
   }, [sessionFilter, user]);
 
@@ -144,6 +187,21 @@ function VideosPageInner() {
         <h1 className="mt-0.5 text-[22px] font-bold tracking-tight">動画ライブラリ</h1>
       </div>
 
+      {trainerMemberLabel && trainerMemberUserId && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-accent/25 bg-accent/10 px-3 py-2.5">
+          <p className="min-w-0 text-xs text-secondary">
+            <span className="font-bold text-primary">{trainerMemberLabel}</span>
+            さんの動画を表示中（ログイン中のトレーナー閲覧）
+          </p>
+          <Link
+            href="/videos"
+            className="shrink-0 text-xs font-bold text-primary underline-offset-2 hover:opacity-80"
+          >
+            自分のライブラリへ
+          </Link>
+        </div>
+      )}
+
       {fetchError && (
         <div className="rounded-xl bg-danger/10 px-4 py-3">
           <p className="text-sm font-bold text-danger">{fetchError}</p>
@@ -156,7 +214,10 @@ function VideosPageInner() {
             <span className="font-bold text-primary">{sessionTitle ?? "このセッション"}</span>
             に紐付いた動画
           </p>
-          <Link href="/videos" className="shrink-0 text-xs font-bold text-muted underline-offset-2 hover:text-primary">
+          <Link
+            href={trainerMemberUserId ? `/videos?member=${encodeURIComponent(trainerMemberUserId)}` : "/videos"}
+            className="shrink-0 text-xs font-bold text-muted underline-offset-2 hover:text-primary"
+          >
             解除
           </Link>
         </div>
@@ -219,18 +280,26 @@ function VideosPageInner() {
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
             <VideoIcon size={26} strokeWidth={1.5} className="text-muted" />
           </div>
-          <p className="mt-5 text-[15px] font-bold">フォームを撮影しよう</p>
-          <p className="mt-2 max-w-[240px] text-center text-sm leading-relaxed text-secondary">
-            {sessionFilter
-              ? "このセッションの撮影動画はまだありません。"
-              : "トレーニング中のフォームを録画して、自分の動きを客観的にチェックできます。"}
+          <p className="mt-5 text-[15px] font-bold">
+            {trainerMemberUserId ? "このメンバーの動画はまだありません" : "フォームを撮影しよう"}
           </p>
-          <Link
-            href="/capture"
-            className="mt-6 flex min-h-[44px] items-center gap-2 rounded-xl bg-inverse px-5 py-2.5 text-sm font-extrabold tracking-wide text-on-inverse transition-all active:scale-[0.98]"
-          >
-            撮影する
-          </Link>
+          <p className="mt-2 max-w-[240px] text-center text-sm leading-relaxed text-secondary">
+            {trainerMemberUserId
+              ? sessionFilter
+                ? "このセッションに紐づく動画はまだありません。"
+                : "メンバーが撮影すると、ここから一覧・再生できます。"
+              : sessionFilter
+                ? "このセッションの撮影動画はまだありません。"
+                : "トレーニング中のフォームを録画して、自分の動きを客観的にチェックできます。"}
+          </p>
+          {!trainerMemberUserId && (
+            <Link
+              href="/capture"
+              className="mt-6 flex min-h-[44px] items-center gap-2 rounded-xl bg-inverse px-5 py-2.5 text-sm font-extrabold tracking-wide text-on-inverse transition-all active:scale-[0.98]"
+            >
+              撮影する
+            </Link>
+          )}
         </div>
       ) : (
         <div className="space-y-3">

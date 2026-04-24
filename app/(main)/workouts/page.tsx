@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { PenSquare, Dumbbell, Video, X, Camera, Loader2, Trash2, Pencil, LogIn } from "lucide-react";
 import { RecordDateBlock } from "@/components/common/RecordDateBlock";
 import { FocusTrap } from "@/components/common/FocusTrap";
@@ -11,6 +11,7 @@ import { ConfirmModal } from "@/components/common/ConfirmModal";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useToast } from "@/lib/hooks/useToast";
 import { createClient } from "@/lib/supabase/client";
+import { validateMemberForTrainer } from "@/lib/trainer/validateMemberForTrainer";
 import type { Json } from "@/types/database.types";
 
 type WorkoutHistoryEntry = {
@@ -61,43 +62,21 @@ function rowToEntry(row: {
   };
 }
 
-export default function WorkoutsPage() {
+function WorkoutsPageInner() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const memberParam = searchParams.get("member");
+  const openParam = searchParams.get("open");
   const { user, loading: authLoading } = useAuth();
   const { toast, show: showToast, dismiss: dismissToast } = useToast();
   const [history, setHistory] = useState<WorkoutHistoryEntry[]>([]);
   const [videoCounts, setVideoCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
+  const [listError, setListError] = useState<string | null>(null);
   const [detailEntry, setDetailEntry] = useState<WorkoutHistoryEntry | null>(null);
-
-  useEffect(() => {
-    if (authLoading) return;
-    if (!user) {
-      setHistory([]);
-      setLoading(false);
-      return;
-    }
-    const supabase = createClient();
-    supabase
-      .from("workouts")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("workout_date", { ascending: false })
-      .then(({ data, error }) => {
-        if (error) {
-          showToast("ワークアウトの読み込みに失敗しました", "error");
-          setLoading(false);
-          return;
-        }
-        const entries = (data ?? []).map(rowToEntry);
-        setHistory(entries);
-        setLoading(false);
-
-        if (entries.length > 0) {
-          fetchVideoCounts(entries.map((e) => e.id));
-        }
-      });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, authLoading]);
+  const [trainerMemberUserId, setTrainerMemberUserId] = useState<string | null>(null);
+  const [trainerMemberLabel, setTrainerMemberLabel] = useState<string | null>(null);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   const fetchVideoCounts = useCallback(async (workoutIds: string[]) => {
     if (workoutIds.length === 0) return;
@@ -120,10 +99,80 @@ export default function WorkoutsPage() {
     setVideoCounts(counts);
   }, []);
 
-  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      setHistory([]);
+      setTrainerMemberUserId(null);
+      setTrainerMemberLabel(null);
+      setListError(null);
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function load() {
+      const trainerUser = user;
+      if (!trainerUser) return;
+      setLoading(true);
+      setListError(null);
+      setTrainerMemberUserId(null);
+      setTrainerMemberLabel(null);
+      const supabase = createClient();
+      let targetUserId = trainerUser.id;
+
+      if (memberParam) {
+        const access = await validateMemberForTrainer(supabase, trainerUser.id, memberParam);
+        if (cancelled) return;
+        if (!access.ok) {
+          const msg =
+            access.reason === "not_trainer"
+              ? "メンバーの履歴を表示するには、トレーナーアカウントでログインしてください。"
+              : "このメンバーの履歴を表示する権限がありません。";
+          setListError(msg);
+          setHistory([]);
+          setVideoCounts({});
+          setLoading(false);
+          return;
+        }
+        targetUserId = access.memberUserId;
+        setTrainerMemberUserId(access.memberUserId);
+        setTrainerMemberLabel(access.displayName);
+      }
+
+      const { data, error } = await supabase
+        .from("workouts")
+        .select("*")
+        .eq("user_id", targetUserId)
+        .order("workout_date", { ascending: false });
+
+      if (cancelled) return;
+      if (error) {
+        showToast("ワークアウトの読み込みに失敗しました", "error");
+        setHistory([]);
+        setVideoCounts({});
+        setLoading(false);
+        return;
+      }
+      const entries = (data ?? []).map(rowToEntry);
+      setHistory(entries);
+      setLoading(false);
+      if (entries.length > 0) {
+        void fetchVideoCounts(entries.map((e) => e.id));
+      } else {
+        setVideoCounts({});
+      }
+    }
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, authLoading, memberParam, showToast, fetchVideoCounts]);
 
   const confirmDelete = useCallback(async () => {
-    if (!user || !deleteTargetId) return;
+    if (!user || !deleteTargetId || trainerMemberUserId) return;
 
     const supabase = createClient();
     const { error } = await supabase.from("workouts").delete().eq("id", deleteTargetId);
@@ -138,12 +187,26 @@ export default function WorkoutsPage() {
     setDetailEntry(null);
     setDeleteTargetId(null);
     showToast("ワークアウトを削除しました", "success");
-  }, [user, deleteTargetId, showToast]);
+  }, [user, deleteTargetId, showToast, trainerMemberUserId]);
 
   const handleDelete = useCallback((entryId: string) => {
-    if (!user) return;
+    if (!user || trainerMemberUserId) return;
     setDeleteTargetId(entryId);
-  }, [user]);
+  }, [user, trainerMemberUserId]);
+
+  useEffect(() => {
+    if (!openParam || history.length === 0) return;
+    const entry = history.find((h) => h.id === openParam);
+    if (entry) setDetailEntry(entry);
+  }, [openParam, history]);
+
+  const closeDetailSheet = useCallback(() => {
+    setDetailEntry(null);
+    if (!openParam) return;
+    const q = new URLSearchParams();
+    if (memberParam) q.set("member", memberParam);
+    router.replace(q.toString() ? `/workouts?${q.toString()}` : "/workouts");
+  }, [openParam, memberParam, router]);
 
   if (loading || authLoading) {
     return (
@@ -154,6 +217,7 @@ export default function WorkoutsPage() {
   }
 
   const isEmpty = history.length === 0;
+  const viewingMember = !!trainerMemberUserId;
 
   return (
     <div className="relative min-h-[calc(100dvh-6rem)]">
@@ -165,11 +229,32 @@ export default function WorkoutsPage() {
         {!isEmpty && <p className="pb-1 text-xs font-caption text-muted">全 {history.length} 件</p>}
       </header>
 
+      {trainerMemberLabel && trainerMemberUserId && (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-accent/25 bg-accent/10 px-3 py-2.5">
+          <p className="min-w-0 text-xs text-secondary">
+            <span className="font-bold text-primary">{trainerMemberLabel}</span>
+            さんの履歴を表示中（閲覧のみ）
+          </p>
+          <Link
+            href="/workouts"
+            className="shrink-0 text-xs font-bold text-primary underline-offset-2 hover:opacity-80"
+          >
+            自分の履歴へ
+          </Link>
+        </div>
+      )}
+
+      {listError && (
+        <div className="mt-4 rounded-xl bg-danger/10 px-4 py-3">
+          <p className="text-sm font-bold text-danger">{listError}</p>
+        </div>
+      )}
+
       {!user ? (
         <GuestPrompt />
-      ) : isEmpty ? (
-        <EmptyState />
-      ) : (
+      ) : isEmpty && !listError ? (
+        <EmptyState readOnly={viewingMember} />
+      ) : !listError ? (
         <div className="mt-6 space-y-3">
           {history.map((entry, i) => (
             <HistoryCard
@@ -177,26 +262,31 @@ export default function WorkoutsPage() {
               entry={entry}
               isLatest={i === 0}
               videoCount={videoCounts[entry.id] ?? 0}
+              memberUserId={trainerMemberUserId}
               onTap={() => setDetailEntry(entry)}
             />
           ))}
         </div>
-      )}
+      ) : null}
 
-      <Link
-        href="/workouts/edit"
-        aria-label="新しいワークアウトを作成"
-        className="fixed bottom-20 right-5 z-40 flex items-center gap-2 rounded-full bg-inverse px-5 py-3.5 text-xs font-extrabold tracking-wide text-on-inverse shadow-lg transition-all duration-200 active:scale-95"
-      >
-        <PenSquare size={14} strokeWidth={2} />
-        新規作成
-      </Link>
+      {!viewingMember && (
+        <Link
+          href="/workouts/edit"
+          aria-label="新しいワークアウトを作成"
+          className="fixed bottom-20 right-5 z-40 flex items-center gap-2 rounded-full bg-inverse px-5 py-3.5 text-xs font-extrabold tracking-wide text-on-inverse shadow-lg transition-all duration-200 active:scale-95"
+        >
+          <PenSquare size={14} strokeWidth={2} />
+          新規作成
+        </Link>
+      )}
 
       {detailEntry && (
         <WorkoutDetailSheet
           entry={detailEntry}
           videoCount={videoCounts[detailEntry.id] ?? 0}
-          onClose={() => setDetailEntry(null)}
+          readOnly={viewingMember}
+          memberUserId={trainerMemberUserId}
+          onClose={closeDetailSheet}
           onDelete={handleDelete}
         />
       )}
@@ -212,6 +302,14 @@ export default function WorkoutsPage() {
         onCancel={() => setDeleteTargetId(null)}
       />
     </div>
+  );
+}
+
+export default function WorkoutsPage() {
+  return (
+    <Suspense fallback={<div className="py-24 text-center text-sm text-muted" role="status">読み込み中…</div>}>
+      <WorkoutsPageInner />
+    </Suspense>
   );
 }
 
@@ -240,23 +338,29 @@ function GuestPrompt() {
   );
 }
 
-function EmptyState() {
+function EmptyState({ readOnly }: { readOnly?: boolean }) {
   return (
     <div className="flex flex-col items-center justify-center py-24">
       <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
         <Dumbbell size={26} strokeWidth={1.5} className="text-muted" />
       </div>
-      <p className="mt-5 text-[15px] font-bold">ワークアウトを始めよう</p>
-      <p className="mt-2 max-w-[240px] text-center text-sm leading-relaxed text-secondary">
-        種目・重量・回数を記録して、トレーニングの成果を見える化できます。
+      <p className="mt-5 text-[15px] font-bold">
+        {readOnly ? "このメンバーの記録はまだありません" : "ワークアウトを始めよう"}
       </p>
-      <Link
-        href="/workouts/edit"
-        className="mt-6 flex min-h-[44px] items-center gap-2 rounded-xl bg-inverse px-5 py-2.5 text-sm font-extrabold tracking-wide text-on-inverse transition-all active:scale-[0.98]"
-      >
-        <PenSquare size={14} strokeWidth={2} />
-        最初のワークアウトを作成
-      </Link>
+      <p className="mt-2 max-w-[240px] text-center text-sm leading-relaxed text-secondary">
+        {readOnly
+          ? "メンバーがワークアウトを記録すると、ここから一覧・詳細を確認できます。"
+          : "種目・重量・回数を記録して、トレーニングの成果を見える化できます。"}
+      </p>
+      {!readOnly && (
+        <Link
+          href="/workouts/edit"
+          className="mt-6 flex min-h-[44px] items-center gap-2 rounded-xl bg-inverse px-5 py-2.5 text-sm font-extrabold tracking-wide text-on-inverse transition-all active:scale-[0.98]"
+        >
+          <PenSquare size={14} strokeWidth={2} />
+          最初のワークアウトを作成
+        </Link>
+      )}
     </div>
   );
 }
@@ -265,11 +369,13 @@ function HistoryCard({
   entry,
   isLatest,
   videoCount,
+  memberUserId,
   onTap,
 }: {
   entry: WorkoutHistoryEntry;
   isLatest: boolean;
   videoCount: number;
+  memberUserId: string | null;
   onTap: () => void;
 }) {
   return (
@@ -287,7 +393,11 @@ function HistoryCard({
             <h3 className="mt-3 truncate text-lg font-bold tracking-tight">{entry.title}</h3>
             {videoCount > 0 && (
               <Link
-                href={`/videos?session=${entry.id}`}
+                href={
+                  memberUserId
+                    ? `/videos?session=${entry.id}&member=${encodeURIComponent(memberUserId)}`
+                    : `/videos?session=${entry.id}`
+                }
                 onClick={(e) => e.stopPropagation()}
                 className="mt-2 inline-flex items-center gap-1 rounded-full bg-chip px-2.5 py-1 text-xs font-extrabold text-secondary transition-colors active:bg-border"
               >
@@ -323,11 +433,15 @@ function HistoryCard({
 function WorkoutDetailSheet({
   entry,
   videoCount,
+  readOnly,
+  memberUserId,
   onClose,
   onDelete,
 }: {
   entry: WorkoutHistoryEntry;
   videoCount: number;
+  readOnly?: boolean;
+  memberUserId: string | null;
   onClose: () => void;
   onDelete: (id: string) => void;
 }) {
@@ -336,9 +450,10 @@ function WorkoutDetailSheet({
   const handleBackdropClick = useCallback(() => onClose(), [onClose]);
 
   const handleEdit = useCallback(() => {
+    if (readOnly) return;
     onClose();
     router.push(`/workouts/edit?id=${entry.id}`);
-  }, [entry.id, router, onClose]);
+  }, [entry.id, router, onClose, readOnly]);
 
   const handleDelete = useCallback(async () => {
     setDeleting(true);
@@ -380,7 +495,14 @@ function WorkoutDetailSheet({
                 </div>
               </div>
               {videoCount > 0 && (
-                <Link href={`/videos?session=${entry.id}`} className="mt-4 flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-chip text-sm font-extrabold text-secondary transition-all active:scale-[0.98]">
+                <Link
+                  href={
+                    memberUserId
+                      ? `/videos?session=${entry.id}&member=${encodeURIComponent(memberUserId)}`
+                      : `/videos?session=${entry.id}`
+                  }
+                  className="mt-4 flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-chip text-sm font-extrabold text-secondary transition-all active:scale-[0.98]"
+                >
                   <Camera size={14} strokeWidth={2} />
                   撮影動画を見る ({videoCount}本)
                 </Link>
@@ -391,26 +513,27 @@ function WorkoutDetailSheet({
                 ))}
               </div>
 
-              {/* Action buttons */}
-              <div className="mt-5 flex gap-2">
-                <button
-                  type="button"
-                  onClick={handleEdit}
-                  className="flex flex-1 min-h-[44px] items-center justify-center gap-2 rounded-xl bg-inverse text-sm font-extrabold tracking-wide text-on-inverse transition-all active:scale-[0.98]"
-                >
-                  <Pencil size={14} strokeWidth={2} />
-                  編集
-                </button>
-                <button
-                  type="button"
-                  onClick={handleDelete}
-                  disabled={deleting}
-                  className="flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-danger/10 px-5 text-sm font-extrabold text-danger transition-all active:scale-[0.98] disabled:opacity-60"
-                >
-                  {deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} strokeWidth={2} />}
-                  削除
-                </button>
-              </div>
+              {!readOnly && (
+                <div className="mt-5 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handleEdit}
+                    className="flex flex-1 min-h-[44px] items-center justify-center gap-2 rounded-xl bg-inverse text-sm font-extrabold tracking-wide text-on-inverse transition-all active:scale-[0.98]"
+                  >
+                    <Pencil size={14} strokeWidth={2} />
+                    編集
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDelete}
+                    disabled={deleting}
+                    className="flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-danger/10 px-5 text-sm font-extrabold text-danger transition-all active:scale-[0.98] disabled:opacity-60"
+                  >
+                    {deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} strokeWidth={2} />}
+                    削除
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </FocusTrap>

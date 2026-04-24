@@ -129,13 +129,13 @@ export default function TrainerPage() {
           .select("id, title, workout_date")
           .eq("user_id", userId)
           .order("workout_date", { ascending: false })
-          .limit(5),
+          .limit(25),
         supabase
           .from("videos")
           .select("id, title, exercise_type, created_at")
           .eq("user_id", userId)
           .order("created_at", { ascending: false })
-          .limit(5),
+          .limit(25),
       ]);
 
       if (workoutRes.error) {

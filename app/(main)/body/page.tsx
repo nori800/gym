@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { PenSquare, Scale, Loader2, LogIn } from "lucide-react";
 import { BodyDetail } from "@/components/body/BodyDetail";
 import { BodyLogForm } from "@/components/body/BodyLogForm";
@@ -10,9 +11,12 @@ import { AppToast } from "@/components/common/AppToast";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useToast } from "@/lib/hooks/useToast";
 import { createClient } from "@/lib/supabase/client";
+import { validateMemberForTrainer } from "@/lib/trainer/validateMemberForTrainer";
 import type { BodyLog } from "@/types";
 
-export default function BodyPage() {
+function BodyPageInner() {
+  const searchParams = useSearchParams();
+  const memberParam = searchParams.get("member");
   const { user, loading: authLoading } = useAuth();
   const { toast, show, dismiss } = useToast();
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -22,31 +26,68 @@ export default function BodyPage() {
   const [logs, setLogs] = useState<BodyLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [trainerMemberUserId, setTrainerMemberUserId] = useState<string | null>(null);
+  const [trainerMemberLabel, setTrainerMemberLabel] = useState<string | null>(null);
 
-  const fetchLogs = useCallback(async () => {
+  const viewOnly = !!trainerMemberUserId;
+
+  useEffect(() => {
+    if (authLoading) return;
     if (!user) {
       setLogs([]);
-      setLoading(false);
-      return;
-    }
-    setFetchError(null);
-    const supabase = createClient();
-    const { data, error } = await supabase
-      .from("body_logs")
-      .select("id, user_id, log_date, weight, body_fat_pct, created_at")
-      .eq("user_id", user.id)
-      .order("log_date", { ascending: true });
-
-    if (error) {
-      setFetchError("ボディログの取得に失敗しました。再読み込みしてください。");
-      setLogs([]);
+      setTrainerMemberUserId(null);
+      setTrainerMemberLabel(null);
+      setFetchError(null);
       setLoading(false);
       return;
     }
 
-    if (data) {
+    let cancelled = false;
+
+    async function load() {
+      const trainerUser = user;
+      if (!trainerUser) return;
+      setLoading(true);
+      setFetchError(null);
+      setTrainerMemberUserId(null);
+      setTrainerMemberLabel(null);
+      const supabase = createClient();
+      let targetUserId = trainerUser.id;
+
+      if (memberParam) {
+        const access = await validateMemberForTrainer(supabase, trainerUser.id, memberParam);
+        if (cancelled) return;
+        if (!access.ok) {
+          const msg =
+            access.reason === "not_trainer"
+              ? "メンバーのボディログを表示するには、トレーナーアカウントでログインしてください。"
+              : "このメンバーのボディログを表示する権限がありません。";
+          setFetchError(msg);
+          setLogs([]);
+          setLoading(false);
+          return;
+        }
+        targetUserId = access.memberUserId;
+        setTrainerMemberUserId(access.memberUserId);
+        setTrainerMemberLabel(access.displayName);
+      }
+
+      const { data, error } = await supabase
+        .from("body_logs")
+        .select("id, user_id, log_date, weight, body_fat_pct, created_at")
+        .eq("user_id", targetUserId)
+        .order("log_date", { ascending: true });
+
+      if (cancelled) return;
+      if (error) {
+        setFetchError("ボディログの取得に失敗しました。再読み込みしてください。");
+        setLogs([]);
+        setLoading(false);
+        return;
+      }
+
       setLogs(
-        data.map((d: { id: string; user_id: string; log_date: string; weight: number | null; body_fat_pct: number | null; created_at: string }) => ({
+        (data ?? []).map((d) => ({
           id: d.id,
           user_id: d.user_id,
           log_date: d.log_date,
@@ -55,32 +96,53 @@ export default function BodyPage() {
           created_at: d.created_at,
         })),
       );
-    } else {
-      setLogs([]);
+      setLoading(false);
     }
-    setLoading(false);
-  }, [user]);
 
-  useEffect(() => {
-    if (!authLoading) fetchLogs();
-  }, [authLoading, fetchLogs]);
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, authLoading, memberParam]);
 
   const handleSaved = useCallback(() => {
-    fetchLogs();
-  }, [fetchLogs]);
+    if (!user || viewOnly) return;
+    const supabase = createClient();
+    void (async () => {
+      const { data, error } = await supabase
+        .from("body_logs")
+        .select("id, user_id, log_date, weight, body_fat_pct, created_at")
+        .eq("user_id", user.id)
+        .order("log_date", { ascending: true });
+      if (!error && data) {
+        setLogs(
+          data.map((d) => ({
+            id: d.id,
+            user_id: d.user_id,
+            log_date: d.log_date,
+            weight: d.weight ?? 0,
+            body_fat: d.body_fat_pct ?? null,
+            created_at: d.created_at,
+          })),
+        );
+      }
+    })();
+  }, [user, viewOnly]);
 
   const openEdit = useCallback((log: BodyLog) => {
+    if (viewOnly) return;
     setEditTarget(log);
     setSheetOpen(true);
-  }, []);
+  }, [viewOnly]);
 
   const openNew = useCallback(() => {
+    if (viewOnly) return;
     setEditTarget(null);
     setSheetOpen(true);
-  }, []);
+  }, [viewOnly]);
 
   const handleDelete = useCallback(async () => {
-    if (!deleteTarget || !user) return;
+    if (!deleteTarget || !user || viewOnly) return;
     setDeleting(true);
     const supabase = createClient();
     const { error } = await supabase
@@ -94,9 +156,9 @@ export default function BodyPage() {
       show("削除に失敗しました", "error");
     } else {
       show("記録を削除しました", "success");
-      fetchLogs();
+      handleSaved();
     }
-  }, [deleteTarget, user, fetchLogs, show]);
+  }, [deleteTarget, user, viewOnly, show, handleSaved]);
 
   if (loading || authLoading) {
     return (
@@ -149,6 +211,21 @@ export default function BodyPage() {
         )}
       </header>
 
+      {trainerMemberLabel && trainerMemberUserId && (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-accent/25 bg-accent/10 px-3 py-2.5">
+          <p className="min-w-0 text-xs text-secondary">
+            <span className="font-bold text-primary">{trainerMemberLabel}</span>
+            さんの記録を表示中（閲覧のみ）
+          </p>
+          <Link
+            href="/body"
+            className="shrink-0 text-xs font-bold text-primary underline-offset-2 hover:opacity-80"
+          >
+            自分のログへ
+          </Link>
+        </div>
+      )}
+
       {fetchError && (
         <div className="mt-4 rounded-xl bg-danger/10 px-4 py-3">
           <p className="text-sm font-bold text-danger">{fetchError}</p>
@@ -160,40 +237,49 @@ export default function BodyPage() {
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
             <Scale size={26} strokeWidth={1.5} className="text-muted" />
           </div>
-          <p className="mt-5 text-[15px] font-bold">体重を記録しよう</p>
-          <p className="mt-2 max-w-[240px] text-center text-sm leading-relaxed text-secondary">
-            体重・体脂肪率を定期的に記録して、推移をグラフで確認できます。
+          <p className="mt-5 text-[15px] font-bold">
+            {viewOnly ? "このメンバーの記録はまだありません" : "体重を記録しよう"}
           </p>
-          <button
-            type="button"
-            onClick={openNew}
-            className="mt-6 flex min-h-[44px] items-center gap-2 rounded-xl bg-inverse px-5 py-2.5 text-sm font-extrabold tracking-wide text-on-inverse transition-all active:scale-[0.98]"
-          >
-            <PenSquare size={14} strokeWidth={2} />
-            最初の記録を追加
-          </button>
+          <p className="mt-2 max-w-[240px] text-center text-sm leading-relaxed text-secondary">
+            {viewOnly
+              ? "メンバーが記録すると、ここからグラフで確認できます。"
+              : "体重・体脂肪率を定期的に記録して、推移をグラフで確認できます。"}
+          </p>
+          {!viewOnly && (
+            <button
+              type="button"
+              onClick={openNew}
+              className="mt-6 flex min-h-[44px] items-center gap-2 rounded-xl bg-inverse px-5 py-2.5 text-sm font-extrabold tracking-wide text-on-inverse transition-all active:scale-[0.98]"
+            >
+              <PenSquare size={14} strokeWidth={2} />
+              最初の記録を追加
+            </button>
+          )}
         </div>
-      ) : (
+      ) : !fetchError ? (
         <div className="mt-6">
           <BodyDetail
             logs={logs}
-            onEdit={openEdit}
-            onDelete={setDeleteTarget}
+            viewOnly={viewOnly}
+            onEdit={viewOnly ? undefined : openEdit}
+            onDelete={viewOnly ? undefined : setDeleteTarget}
           />
         </div>
-      )}
+      ) : null}
 
-      {/* Sheet: new / edit */}
-      {sheetOpen && (
+      {!viewOnly && sheetOpen && (
         <button
           type="button"
           className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-[2px] transition-opacity"
           aria-label="閉じる"
-          onClick={() => { setSheetOpen(false); setEditTarget(null); }}
+          onClick={() => {
+            setSheetOpen(false);
+            setEditTarget(null);
+          }}
         />
       )}
 
-      {sheetOpen && (
+      {!viewOnly && sheetOpen && (
         <div
           className="pointer-events-none fixed inset-x-0 bottom-0 z-[110] mx-auto max-w-md"
           role="dialog"
@@ -204,7 +290,10 @@ export default function BodyPage() {
             <div className="pointer-events-auto max-h-[min(92dvh,calc(100dvh-1rem))] overflow-y-auto rounded-t-[18px] animate-fade-in">
               <BodyLogForm
                 editLog={editTarget}
-                onClose={() => { setSheetOpen(false); setEditTarget(null); }}
+                onClose={() => {
+                  setSheetOpen(false);
+                  setEditTarget(null);
+                }}
                 onSaved={handleSaved}
               />
             </div>
@@ -212,8 +301,7 @@ export default function BodyPage() {
         </div>
       )}
 
-      {/* Delete confirmation */}
-      {deleteTarget && (
+      {!viewOnly && deleteTarget && (
         <>
           <button
             type="button"
@@ -258,7 +346,7 @@ export default function BodyPage() {
         </>
       )}
 
-      {!sheetOpen && !deleteTarget && (
+      {!viewOnly && !sheetOpen && !deleteTarget && (
         <button
           type="button"
           onClick={openNew}
@@ -272,5 +360,13 @@ export default function BodyPage() {
 
       <AppToast toast={toast} onDismiss={dismiss} />
     </div>
+  );
+}
+
+export default function BodyPage() {
+  return (
+    <Suspense fallback={<div className="py-24 text-center text-sm text-muted" role="status">読み込み中…</div>}>
+      <BodyPageInner />
+    </Suspense>
   );
 }

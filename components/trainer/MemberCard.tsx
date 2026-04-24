@@ -88,6 +88,35 @@ export function MemberCard({
             </div>
           ) : detail ? (
             <div className="space-y-4">
+              <div className="flex flex-col gap-2 rounded-xl bg-surface p-3">
+                <p className="text-[11px] font-title uppercase tracking-[0.12em] text-muted">
+                  メンバー全体のデータ
+                </p>
+                <p className="text-xs leading-relaxed text-secondary">
+                  共有リンクなしで閲覧できます。ログイン中のトレーナー権限で一覧・再生します。
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Link
+                    href={`/videos?member=${encodeURIComponent(member.user_id)}`}
+                    className="inline-flex min-h-[40px] flex-1 items-center justify-center rounded-lg border border-border bg-white px-3 text-xs font-bold text-primary transition-colors active:bg-chip"
+                  >
+                    動画一覧
+                  </Link>
+                  <Link
+                    href={`/workouts?member=${encodeURIComponent(member.user_id)}`}
+                    className="inline-flex min-h-[40px] flex-1 items-center justify-center rounded-lg border border-border bg-white px-3 text-xs font-bold text-primary transition-colors active:bg-chip"
+                  >
+                    ワークアウト
+                  </Link>
+                  <Link
+                    href={`/body?member=${encodeURIComponent(member.user_id)}`}
+                    className="inline-flex min-h-[40px] flex-1 basis-full items-center justify-center rounded-lg border border-border bg-white px-3 text-xs font-bold text-primary transition-colors active:bg-chip sm:basis-auto"
+                  >
+                    ボディログ
+                  </Link>
+                </div>
+              </div>
+
               <DetailSection
                 icon={Dumbbell}
                 title="最近のワークアウト"
@@ -95,7 +124,7 @@ export function MemberCard({
                 renderItem={(w) => (
                   <li key={w.id}>
                     <Link
-                      href={`/workouts/edit?id=${w.id}`}
+                      href={`/workouts?member=${encodeURIComponent(member.user_id)}&open=${encodeURIComponent(w.id)}`}
                       className="flex min-h-[44px] items-center justify-between rounded-lg bg-surface px-3 py-2 transition-colors active:bg-chip"
                     >
                       <span className="truncate text-sm">{w.title}</span>
