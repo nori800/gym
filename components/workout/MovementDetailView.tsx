@@ -115,7 +115,9 @@ export function MovementDetailView({
             <button
               type="button"
               role="tab"
+              id="tab-overview"
               aria-selected={segment === "overview"}
+              aria-controls="tabpanel-overview"
               onClick={() => setSegment("overview")}
               className={`flex-1 py-3 text-center text-[13px] font-extrabold tracking-wide transition-colors ${
                 segment === "overview"
@@ -128,7 +130,9 @@ export function MovementDetailView({
             <button
               type="button"
               role="tab"
+              id="tab-muscles"
               aria-selected={segment === "muscles"}
+              aria-controls="tabpanel-muscles"
               onClick={() => setSegment("muscles")}
               className={`flex-1 py-3 text-center text-[13px] font-extrabold tracking-wide transition-colors ${
                 segment === "muscles"
@@ -141,15 +145,15 @@ export function MovementDetailView({
           </div>
 
           {segment === "overview" ? (
-            <div className="p-[18px]">
-              <span className="inline-block rounded-full bg-chip px-2.5 py-0.5 text-[10px] font-extrabold text-secondary">
+            <div className="p-[18px]" role="tabpanel" id="tabpanel-overview" aria-labelledby="tab-overview">
+              <span className="inline-block rounded-full bg-chip px-2.5 py-0.5 text-xs font-extrabold text-secondary">
                 {movement.categoryJa}
               </span>
               <h3 className="mt-2 text-xl font-bold tracking-tight">{movement.nameJa}</h3>
               <p className="mt-1.5 text-sm leading-relaxed text-secondary">{movement.descJa}</p>
             </div>
           ) : (
-            <div className="p-[18px]">
+            <div className="p-[18px]" role="tabpanel" id="tabpanel-muscles" aria-labelledby="tab-muscles">
               <p className="text-xs font-title uppercase tracking-[0.12em] text-muted">
                 主に鍛えられる筋肉
               </p>
@@ -157,7 +161,7 @@ export function MovementDetailView({
                 {muscles.map((m) => (
                   <span
                     key={m}
-                    className="rounded-full bg-chip px-3 py-1.5 text-[12px] font-bold text-primary"
+                    className="rounded-full bg-chip px-3 py-1.5 text-xs font-bold text-primary"
                   >
                     {m}
                   </span>
@@ -203,7 +207,7 @@ export function MovementDetailView({
             aria-expanded={weightSectionExpanded}
           >
             <div className="min-w-0 flex-1">
-              <p className="text-[10px] font-title uppercase tracking-[0.12em] text-muted">ウェイトモード</p>
+              <p className="text-xs font-title uppercase tracking-[0.12em] text-muted">ウェイトモード</p>
               <p className="mt-0.5 truncate text-sm font-bold text-primary">
                 {selectedWeightMode?.label ?? "—"}
               </p>
@@ -255,7 +259,7 @@ export function MovementDetailView({
                   {WEIGHT_MODES.map(({ label, desc }) => (
                     <div key={label}>
                       <p className="text-[12px] font-bold text-primary">{label}</p>
-                      <p className="text-[11px] leading-relaxed text-secondary">{desc}</p>
+                      <p className="text-xs leading-relaxed text-secondary">{desc}</p>
                     </div>
                   ))}
                 </div>
@@ -281,7 +285,7 @@ export function MovementDetailView({
             aria-expanded={assistanceSectionExpanded}
           >
             <div className="min-w-0 flex-1">
-              <p className="text-[10px] font-title uppercase tracking-[0.12em] text-muted">アシスタンス</p>
+              <p className="text-xs font-title uppercase tracking-[0.12em] text-muted">アシスタンス</p>
               <p className="mt-0.5 truncate text-sm font-bold text-primary">
                 {selectedAssistance?.label ?? "—"}
               </p>
@@ -333,7 +337,7 @@ export function MovementDetailView({
                   {ASSISTANCE_TYPES.map(({ label, desc }) => (
                     <div key={label}>
                       <p className="text-[12px] font-bold text-primary">{label}</p>
-                      <p className="text-[11px] leading-relaxed text-secondary">{desc}</p>
+                      <p className="text-xs leading-relaxed text-secondary">{desc}</p>
                     </div>
                   ))}
                 </div>
@@ -382,13 +386,13 @@ export function MovementDetailView({
             <>
               {/* Column headers */}
               <div className="flex items-center gap-3 border-t border-border px-[18px] pt-3 pb-2.5">
-                <span className="w-10 text-[10px] font-extrabold uppercase tracking-[0.12em] text-secondary">
+                <span className="w-10 text-xs font-extrabold uppercase tracking-[0.12em] text-secondary">
                   セット
                 </span>
-                <span className="flex-1 text-center text-[10px] font-extrabold uppercase tracking-[0.12em] text-secondary">
+                <span className="flex-1 text-center text-xs font-extrabold uppercase tracking-[0.12em] text-secondary">
                   重量 (kg)
                 </span>
-                <span className="flex-1 text-center text-[10px] font-extrabold uppercase tracking-[0.12em] text-secondary">
+                <span className="flex-1 text-center text-xs font-extrabold uppercase tracking-[0.12em] text-secondary">
                   回数
                 </span>
               </div>
@@ -406,7 +410,7 @@ export function MovementDetailView({
                         {i + 1}
                       </span>
                       {isWarmup && (
-                        <span className="text-[9px] font-extrabold tracking-wider text-muted">W</span>
+                        <span className="text-xs font-extrabold tracking-wider text-muted">W</span>
                       )}
                     </div>
                     <div className="flex flex-1 justify-center">

@@ -62,7 +62,8 @@ function arcPath(
 }
 
 const ACCENT = "#3eed8d";
-const HIT_RADIUS = 22;
+const HIT_RADIUS = 32;
+const VISUAL_RADIUS = 16;
 
 export function AngleTool({
   active,
@@ -128,18 +129,32 @@ export function AngleTool({
           <MeasurementDisplay key={m.id} measurement={m} />
         ))}
 
-        {/* Pending points */}
+        {/* Pending points — large invisible hit area + visible indicator */}
         {pending.map((pt, i) => (
-          <circle
-            key={i}
-            cx={pt[0]}
-            cy={pt[1]}
-            r={HIT_RADIUS}
-            fill={ACCENT}
-            fillOpacity={0.3}
-            stroke={ACCENT}
-            strokeWidth={2}
-          />
+          <g key={i}>
+            <circle
+              cx={pt[0]}
+              cy={pt[1]}
+              r={HIT_RADIUS}
+              fill={ACCENT}
+              fillOpacity={0.1}
+            />
+            <circle
+              cx={pt[0]}
+              cy={pt[1]}
+              r={VISUAL_RADIUS}
+              fill={ACCENT}
+              fillOpacity={0.35}
+              stroke={ACCENT}
+              strokeWidth={2}
+            />
+            <circle
+              cx={pt[0]}
+              cy={pt[1]}
+              r={4}
+              fill="white"
+            />
+          </g>
         ))}
         {pending.length === 2 && (
           <line

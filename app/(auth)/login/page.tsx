@@ -57,7 +57,7 @@ export default function LoginPage() {
 
       <div className="space-y-5">
         <div>
-          <label className="mb-1.5 block text-[11px] font-label text-secondary">
+          <label className="mb-1.5 block text-xs font-label text-secondary">
             メールアドレス
           </label>
           <input
@@ -72,7 +72,7 @@ export default function LoginPage() {
           {errors.email && <p className="mt-1 text-xs text-danger">{errors.email}</p>}
         </div>
         <div>
-          <label className="mb-1.5 block text-[11px] font-label text-secondary">
+          <label className="mb-1.5 block text-xs font-label text-secondary">
             パスワード
           </label>
           <input

@@ -48,12 +48,17 @@ export default function TrainerPage() {
   const fetchRole = useCallback(async () => {
     if (!user) return;
     const supabase = createClient();
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("profiles")
       .select("role")
       .eq("user_id", user.id)
       .single();
-    setRole(data?.role ?? null);
+    if (error) {
+      console.error("[trainer] fetchRole error:", error.message);
+      setRole("member");
+      return;
+    }
+    setRole(data?.role ?? "member");
   }, [user]);
 
   const fetchMembers = useCallback(async () => {
@@ -64,10 +69,17 @@ export default function TrainerPage() {
     }
     const supabase = createClient();
 
-    const { data: profiles } = await supabase
+    const { data: profiles, error: profilesError } = await supabase
       .from("profiles")
       .select("id, user_id, display_name, weight")
       .eq("trainer_id", user.id);
+
+    if (profilesError) {
+      console.error("[trainer] fetchMembers error:", profilesError.message);
+      setMembers([]);
+      setLoading(false);
+      return;
+    }
 
     if (!profiles || profiles.length === 0) {
       setMembers([]);

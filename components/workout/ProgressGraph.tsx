@@ -109,7 +109,7 @@ export function ProgressGraph({ data, mode }: ProgressGraphProps) {
       ? `${linePath} L${points[points.length - 1].x},${PADDING.top + chartH} L${points[0].x},${PADDING.top + chartH} Z`
       : "";
 
-  const unit = mode === "weight" ? "kg" : "kg";
+  const unit = mode === "weight" ? "kg" : "kg·回";
   const ariaLabel = `${mode === "weight" ? "最大重量" : "総ボリューム"}の推移グラフ。${
     filtered.length
       ? `${fmtDate(filtered[0].date)}〜${fmtDate(filtered[filtered.length - 1].date)}、${filtered.length}件のデータ`
@@ -125,7 +125,8 @@ export function ProgressGraph({ data, mode }: ProgressGraphProps) {
             key={p.key}
             type="button"
             onClick={() => setPeriod(p.key)}
-            className={`rounded-full px-3 py-1 text-[11px] font-label transition-colors ${
+            aria-pressed={period === p.key}
+            className={`rounded-full px-3 py-1 text-xs font-label transition-colors ${
               period === p.key
                 ? "bg-inverse text-on-inverse"
                 : "bg-surface text-secondary active:bg-chip"
@@ -172,7 +173,7 @@ export function ProgressGraph({ data, mode }: ProgressGraphProps) {
                         x={PADDING.left - 6}
                         y={y + 3}
                         textAnchor="end"
-                        className="fill-muted text-[9px]"
+                        className="fill-muted text-[10px]"
                       >
                         {v % 1 === 0 ? v : v.toFixed(1)}
                       </text>
@@ -190,7 +191,7 @@ export function ProgressGraph({ data, mode }: ProgressGraphProps) {
                       x={p.x}
                       y={PADDING.top + chartH + 16}
                       textAnchor="middle"
-                      className="fill-muted text-[9px]"
+                      className="fill-muted text-[10px]"
                     >
                       {fmtDate(filtered[idx].date)}
                     </text>

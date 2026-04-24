@@ -11,7 +11,9 @@ export async function updateSession(request: NextRequest) {
     console.error(
       "[middleware] NEXT_PUBLIC_SUPABASE_URL またはクライアント用キー（NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY、または移行中の NEXT_PUBLIC_SUPABASE_ANON_KEY）が未設定です。`.env.local` / Vercel の Environment Variables を確認し、サーバーを再起動してください。",
     );
-    return NextResponse.next({ request });
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    return NextResponse.redirect(url);
   }
 
   let supabaseResponse = NextResponse.next({ request });
@@ -46,6 +48,20 @@ export async function updateSession(request: NextRequest) {
     user = data.user ?? null;
   } catch (cause) {
     console.error("[middleware] supabase.auth.getUser failed:", cause);
+    const { pathname } = request.nextUrl;
+    const isProtected =
+      pathname.startsWith("/dashboard") ||
+      pathname.startsWith("/workouts") ||
+      pathname.startsWith("/body") ||
+      pathname.startsWith("/capture") ||
+      pathname.startsWith("/videos") ||
+      pathname.startsWith("/settings") ||
+      pathname.startsWith("/trainer");
+    if (isProtected) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      return NextResponse.redirect(url);
+    }
     return NextResponse.next({ request });
   }
 
@@ -57,7 +73,8 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/body") ||
     pathname.startsWith("/capture") ||
     pathname.startsWith("/videos") ||
-    pathname.startsWith("/settings");
+    pathname.startsWith("/settings") ||
+    pathname.startsWith("/trainer");
 
   if (!user && isProtected) {
     const url = request.nextUrl.clone();

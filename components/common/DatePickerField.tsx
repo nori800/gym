@@ -217,7 +217,7 @@ export function DatePickerField({ value, onChange, "aria-label": ariaLabel = "æ—
                   {WEEKDAYS.map((w, col) => (
                     <span
                       key={w}
-                      className={`pb-1 text-[11px] font-bold ${weekdayHeaderClass(col)}`}
+                      className={`pb-1 text-xs font-bold ${weekdayHeaderClass(col)}`}
                     >
                       {w}
                     </span>
@@ -253,7 +253,7 @@ export function DatePickerField({ value, onChange, "aria-label": ariaLabel = "æ—
                       </button>
                     );
                   })}
-                  <p className="col-span-7 mt-2 text-left text-[10px] leading-relaxed text-secondary">
+                  <p className="col-span-7 mt-2 text-left text-xs leading-relaxed text-secondary">
                     <span className="font-bold text-red-600">æ—¥</span>
                     <span className="text-muted">ãƒ»</span>
                     <span className="font-bold text-blue-600">åœŸ</span>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 type LastSessionData = {
@@ -25,12 +25,18 @@ type BlockJson = {
   movements?: BlockMovement[];
 };
 
+let cacheGeneration = 0;
 const cache = new Map<string, Omit<LastSessionData, "loading">>();
+
+export function invalidateLastSessionCache() {
+  cacheGeneration++;
+  cache.clear();
+}
 
 export function useLastSession(
   movementId: string,
   userId: string | undefined,
-): LastSessionData {
+): LastSessionData & { refresh: () => void } {
   const [data, setData] = useState<LastSessionData>({
     lastWeight: null,
     lastReps: null,
@@ -40,8 +46,9 @@ export function useLastSession(
   });
 
   const fetchedRef = useRef<string | null>(null);
+  const generationRef = useRef(cacheGeneration);
 
-  useEffect(() => {
+  const fetchData = useCallback(() => {
     if (!userId || !movementId) {
       setData((prev) => ({ ...prev, loading: false }));
       return;
@@ -49,13 +56,13 @@ export function useLastSession(
 
     const cacheKey = `${userId}:${movementId}`;
 
-    if (cache.has(cacheKey)) {
+    if (generationRef.current === cacheGeneration && cache.has(cacheKey)) {
       const cached = cache.get(cacheKey)!;
       setData({ ...cached, loading: false });
       return;
     }
 
-    if (fetchedRef.current === cacheKey) return;
+    generationRef.current = cacheGeneration;
     fetchedRef.current = cacheKey;
 
     const supabase = createClient();
@@ -113,5 +120,17 @@ export function useLastSession(
       });
   }, [movementId, userId]);
 
-  return data;
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const refresh = useCallback(() => {
+    const cacheKey = `${userId}:${movementId}`;
+    cache.delete(cacheKey);
+    fetchedRef.current = null;
+    setData((prev) => ({ ...prev, loading: true }));
+    fetchData();
+  }, [userId, movementId, fetchData]);
+
+  return { ...data, refresh };
 }

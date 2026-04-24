@@ -21,6 +21,7 @@ export default function BodyPage() {
   const [deleting, setDeleting] = useState(false);
   const [logs, setLogs] = useState<BodyLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   const fetchLogs = useCallback(async () => {
     if (!user) {
@@ -28,12 +29,20 @@ export default function BodyPage() {
       setLoading(false);
       return;
     }
+    setFetchError(null);
     const supabase = createClient();
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("body_logs")
       .select("id, user_id, log_date, weight, body_fat_pct, created_at")
       .eq("user_id", user.id)
       .order("log_date", { ascending: true });
+
+    if (error) {
+      setFetchError("ボディログの取得に失敗しました。再読み込みしてください。");
+      setLogs([]);
+      setLoading(false);
+      return;
+    }
 
     if (data) {
       setLogs(
@@ -140,7 +149,13 @@ export default function BodyPage() {
         )}
       </header>
 
-      {isEmpty ? (
+      {fetchError && (
+        <div className="mt-4 rounded-xl bg-danger/10 px-4 py-3">
+          <p className="text-sm font-bold text-danger">{fetchError}</p>
+        </div>
+      )}
+
+      {isEmpty && !fetchError ? (
         <div className="flex flex-col items-center justify-center py-24">
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
             <Scale size={26} strokeWidth={1.5} className="text-muted" />

@@ -60,7 +60,7 @@ function TabItem({
         }`}
       />
       <span
-        className={`max-w-full truncate px-0.5 text-center text-[10px] ${
+        className={`max-w-full truncate px-0.5 text-center text-xs ${
           isActive ? "font-label text-primary" : "font-caption text-muted"
         }`}
       >
@@ -132,7 +132,7 @@ export function BottomNav({ userRole }: { userRole?: string }) {
             <Icon size={22} strokeWidth={1.75} className={captureActive ? "text-primary" : "text-on-inverse"} />
           </Link>
           <span
-            className={`mt-1 max-w-full truncate text-center text-[10px] ${
+            className={`mt-1 max-w-full truncate text-center text-xs ${
               captureActive ? "font-label text-primary" : "font-caption text-muted"
             }`}
           >

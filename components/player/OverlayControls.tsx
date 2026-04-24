@@ -37,7 +37,7 @@ export function OverlayControls({
             key={type}
             type="button"
             onClick={() => onToggleGrid(type)}
-            className={`flex items-center gap-1 rounded-md px-2 py-1.5 text-[11px] transition-colors ${
+            className={`flex items-center gap-1 rounded-md px-2 py-1.5 text-xs transition-colors ${
               activeGrids.has(type) ? "bg-white text-primary shadow-sm" : "text-muted"
             }`}
           >
@@ -77,7 +77,7 @@ export function OverlayControls({
           />
         </div>
 
-        <div className="flex items-center gap-1.5 text-[10px] text-muted">
+        <div className="flex items-center gap-1.5 text-xs text-muted">
           <span>透明度</span>
           <input
             type="range"

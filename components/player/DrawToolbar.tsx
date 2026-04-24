@@ -33,7 +33,7 @@ export function DrawToolbar({
           key={tool}
           type="button"
           onClick={() => onToolChange(activeTool === tool ? "none" : tool)}
-          className={`flex items-center gap-1 rounded-md px-2 py-1.5 text-[11px] transition-colors ${
+          className={`flex items-center gap-1 rounded-md px-2 py-1.5 text-xs transition-colors ${
             activeTool === tool ? "bg-white text-primary shadow-sm" : "text-muted"
           }`}
         >

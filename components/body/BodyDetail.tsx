@@ -165,7 +165,7 @@ export function BodyDetail({ logs, onEdit, onDelete }: BodyDetailProps) {
               key={key}
               type="button"
               onClick={() => setRange(key)}
-              className={`rounded-full px-3.5 py-1.5 text-[11px] font-extrabold tracking-wide transition-all duration-150 active:scale-95 ${
+              className={`rounded-full px-3.5 py-1.5 text-xs font-extrabold tracking-wide transition-all duration-150 active:scale-95 ${
                 range === key
                   ? "bg-inverse text-on-inverse"
                   : "bg-white text-secondary shadow-[0_0_0_1px_rgba(0,0,0,.08)]"
@@ -265,7 +265,7 @@ export function BodyDetail({ logs, onEdit, onDelete }: BodyDetailProps) {
             ))}
         </svg>
 
-        <div className="mt-3 flex gap-4 text-[10px] text-secondary">
+        <div className="mt-3 flex gap-4 text-xs text-secondary">
           <span className="flex items-center gap-1.5">
             <span className="inline-block h-0.5 w-3 rounded-full bg-accent" /> 体重 (kg)
           </span>

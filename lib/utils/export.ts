@@ -75,12 +75,22 @@ export function downloadCSV(content: string, filename: string): void {
   URL.revokeObjectURL(url);
 }
 
+function escapeHTML(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 export function generatePDFHTML(title: string, content: string): string {
+  const safeTitle = escapeHTML(title);
   return `<!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>${title}</title>
+<title>${safeTitle}</title>
 <style>
   @page { margin: 20mm; }
   body {
@@ -124,7 +134,7 @@ export function generatePDFHTML(title: string, content: string): string {
 </style>
 </head>
 <body>
-<h1>${title}</h1>
+<h1>${safeTitle}</h1>
 <p class="meta">出力日: ${new Date().toLocaleDateString("ja-JP")}</p>
 ${content}
 </body>

@@ -226,7 +226,7 @@ function CompareContent() {
     [],
   );
 
-  const syncPlay = useCallback(() => {
+  const syncPlay = useCallback(async () => {
     const a = videoRefA.current;
     const b = videoRefB.current;
     if (!a || !b) return;
@@ -235,8 +235,24 @@ function CompareContent() {
     b.currentTime = 0;
     a.playbackRate = speed;
     b.playbackRate = speed;
-    a.play().then(() => setPanelA((p) => ({ ...p, playing: true }))).catch(() => {});
-    b.play().then(() => setPanelB((p) => ({ ...p, playing: true }))).catch(() => {});
+
+    const waitCanPlay = (el: HTMLVideoElement) =>
+      el.readyState >= 3
+        ? Promise.resolve()
+        : new Promise<void>((resolve) => {
+            const handler = () => { el.removeEventListener("canplay", handler); resolve(); };
+            el.addEventListener("canplay", handler);
+          });
+
+    try {
+      await Promise.all([waitCanPlay(a), waitCanPlay(b)]);
+      await Promise.all([a.play(), b.play()]);
+      setPanelA((p) => ({ ...p, playing: true }));
+      setPanelB((p) => ({ ...p, playing: true }));
+    } catch (err) {
+      console.error("[compare] sync play failed:", err);
+      setSynced(false);
+    }
   }, [speed]);
 
   const syncStop = useCallback(() => {
@@ -333,15 +349,15 @@ function CompareContent() {
 
         {/* Info badge */}
         <div className="absolute left-2 top-2 flex flex-col gap-1">
-          <span className="rounded-md bg-black/60 px-2 py-0.5 text-[10px] font-title text-white/90 backdrop-blur-sm">
+          <span className="rounded-md bg-black/60 px-2 py-0.5 text-xs font-title text-white/90 backdrop-blur-sm">
             {label}
           </span>
           {panel.video && (
             <>
-              <span className="rounded-md bg-black/60 px-2 py-0.5 text-[10px] font-label text-white/70 backdrop-blur-sm">
+              <span className="rounded-md bg-black/60 px-2 py-0.5 text-xs font-label text-white/70 backdrop-blur-sm">
                 {panel.video.title}
               </span>
-              <span className="rounded-md bg-black/60 px-2 py-0.5 text-[9px] font-label text-white/50 backdrop-blur-sm">
+              <span className="rounded-md bg-black/60 px-2 py-0.5 text-xs font-label text-white/50 backdrop-blur-sm">
                 {panel.video.exercise_type}
               </span>
             </>
@@ -360,7 +376,7 @@ function CompareContent() {
         >
           {panel.playing ? <Pause size={14} /> : <Play size={14} className="ml-0.5" />}
         </button>
-        <span className="w-8 text-right text-[9px] font-metric text-white/50 tabular-nums">
+        <span className="w-8 text-right text-xs font-metric text-white/50 tabular-nums">
           {fmtTime(panel.currentTime)}
         </span>
         <input
@@ -374,7 +390,7 @@ function CompareContent() {
           className="h-0.5 flex-1 accent-white disabled:opacity-30"
           aria-label={`${label}の再生位置`}
         />
-        <span className="w-8 text-[9px] font-metric text-white/50 tabular-nums">
+        <span className="w-8 text-xs font-metric text-white/50 tabular-nums">
           {fmtTime(panel.duration)}
         </span>
         <button
@@ -423,7 +439,7 @@ function CompareContent() {
             <button
               type="button"
               onClick={syncStop}
-              className="flex items-center gap-1.5 rounded-full bg-white/10 px-4 py-2 text-[11px] font-label text-white/90 transition-all active:bg-white/20"
+              className="flex items-center gap-1.5 rounded-full bg-white/10 px-4 py-2 text-xs font-label text-white/90 transition-all active:bg-white/20"
             >
               <Unlink size={13} strokeWidth={1.5} />
               同期停止
@@ -432,7 +448,7 @@ function CompareContent() {
             <button
               type="button"
               onClick={syncPlay}
-              className="flex items-center gap-1.5 rounded-full bg-[#3eed8d] px-4 py-2 text-[11px] font-title text-primary transition-all active:scale-95"
+              className="flex items-center gap-1.5 rounded-full bg-[#3eed8d] px-4 py-2 text-xs font-title text-primary transition-all active:scale-95"
             >
               <Link2 size={13} strokeWidth={1.5} />
               同期再生
@@ -447,7 +463,7 @@ function CompareContent() {
                 e.stopPropagation();
                 setSpeedOpen((p) => !p);
               }}
-              className="rounded-full bg-white/10 px-3 py-2 text-[11px] font-metric text-white/70 transition-colors active:bg-white/20"
+              className="rounded-full bg-white/10 px-3 py-2 text-xs font-metric text-white/70 transition-colors active:bg-white/20"
               aria-label={`再生速度 ${speed}倍`}
             >
               {speed}x

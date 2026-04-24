@@ -3,7 +3,7 @@
 import { Camera } from "lucide-react";
 import type { Block } from "@/types/workout";
 import { formatBlockSetsLabel, formatMovementMeta } from "@/types/workout";
-import { getMovementById } from "@/lib/mocks/movements";
+import { getMovementById } from "@/lib/data/movements";
 
 interface BlockCardProps {
   block: Block;
@@ -59,7 +59,7 @@ export function BlockCard({ block, onAddMove, onCapture }: BlockCardProps) {
                   className="grid min-h-[76px] grid-cols-[64px_1fr_auto] items-center gap-3.5 border-t border-border px-3.5"
                 >
                   <div className="flex h-12 w-16 items-center justify-center rounded-[10px] bg-neutral-200">
-                    <span className="text-[10px] text-muted">{movement.categoryJa}</span>
+                    <span className="text-xs text-muted">{movement.categoryJa}</span>
                   </div>
                   <div className="min-w-0 py-3">
                     <p className="text-[17px] font-bold tracking-tight">{movement.nameJa}</p>

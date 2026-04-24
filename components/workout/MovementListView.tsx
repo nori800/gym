@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import { ArrowLeft, Search, X, Plus } from "lucide-react";
 import type { Movement } from "@/types/workout";
-import { searchMovements, getMovementsByCategory } from "@/lib/mocks/movements";
+import { searchMovements, getMovementsByCategory } from "@/lib/data/movements";
 
 interface MovementListViewProps {
   selectedId: string | null;
@@ -114,7 +114,7 @@ export function MovementListView({
                 key={cat}
                 type="button"
                 onClick={() => setActiveCategory(cat)}
-                className={`shrink-0 rounded-full px-3.5 py-1.5 text-[11px] font-extrabold tracking-wide transition-all duration-150 active:scale-95 ${
+                className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-extrabold tracking-wide transition-all duration-150 active:scale-95 ${
                   activeCategory === cat
                     ? "bg-inverse text-on-inverse"
                     : "bg-white text-secondary shadow-[0_0_0_1px_rgba(0,0,0,.08)]"
@@ -288,14 +288,14 @@ function MovementRow({
     >
       {/* Thumbnail placeholder */}
       <div className="flex h-12 w-16 items-center justify-center rounded-[10px] bg-neutral-200">
-        <span className="text-[10px] font-bold text-muted">{movement.categoryJa}</span>
+        <span className="text-xs font-bold text-muted">{movement.categoryJa}</span>
       </div>
 
       <div className="min-w-0 py-2">
         <span className="block text-[17px] font-bold tracking-tight">
           {movement.nameJa}
           {isCustom && (
-            <span className="ml-1.5 inline-block rounded-full bg-inverse/10 px-1.5 py-0.5 align-middle text-[10px] font-extrabold text-secondary">
+            <span className="ml-1.5 inline-block rounded-full bg-inverse/10 px-1.5 py-0.5 align-middle text-xs font-extrabold text-secondary">
               カスタム
             </span>
           )}
@@ -306,7 +306,7 @@ function MovementRow({
       </div>
 
       {isSelected ? (
-        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-inverse text-[11px] text-on-inverse">
+        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-inverse text-xs text-on-inverse">
           ✓
         </div>
       ) : (

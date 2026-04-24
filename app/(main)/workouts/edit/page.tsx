@@ -9,7 +9,7 @@ import { DatePickerField } from "@/components/common/DatePickerField";
 import { AppToast } from "@/components/common/AppToast";
 import type { MovementConfig, WorkoutDraft, Block } from "@/types/workout";
 import { createDefaultConfig, createEmptyBlock } from "@/types/workout";
-import { getMovementById } from "@/lib/mocks/movements";
+import { getMovementById } from "@/lib/data/movements";
 import { BlockCard } from "@/components/workout/BlockCard";
 import { MovementListView } from "@/components/workout/MovementListView";
 import { MovementDetailView } from "@/components/workout/MovementDetailView";
@@ -625,7 +625,7 @@ function WorkoutEditInner() {
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-bold tracking-tight">フォームを撮影する</p>
-                <p className="mt-0.5 text-[11px] text-secondary">
+                <p className="mt-0.5 text-xs text-secondary">
                   このワークアウトのセットを動画で記録
                 </p>
               </div>
@@ -680,7 +680,7 @@ function WorkoutEditInner() {
                         <p className="text-sm font-bold tracking-tight">{tpl.title}</p>
                         <div className="mt-1.5 flex flex-wrap gap-1">
                           {tpl.categories.map((c) => (
-                            <span key={c} className="rounded-full bg-chip px-2.5 py-0.5 text-[10px] font-extrabold text-secondary">{c}</span>
+                            <span key={c} className="rounded-full bg-chip px-2.5 py-0.5 text-xs font-extrabold text-secondary">{c}</span>
                           ))}
                         </div>
                       </button>

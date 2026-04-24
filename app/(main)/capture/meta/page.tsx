@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Check, Camera, Save, Loader2 } from "lucide-react";
-import { MOVEMENTS } from "@/lib/mocks/movements";
+import { MOVEMENTS } from "@/lib/data/movements";
 import { PrimaryRecordButton } from "@/components/common/PrimaryRecordButton";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { createClient } from "@/lib/supabase/client";
@@ -142,6 +142,11 @@ export default function CaptureMetaPage() {
       return;
     }
 
+    if (!user) {
+      setSaveError("動画を保存するにはログインが必要です。ログイン後に再度撮影してください。");
+      return;
+    }
+
     setPhase("saving");
     setSaveError(null);
 
@@ -163,6 +168,11 @@ export default function CaptureMetaPage() {
   const handleVideoOnly = useCallback(async () => {
     if (user && !videoBlob) {
       setSaveError("動画データを取得できませんでした。撮影画面に戻ってやり直してください。");
+      return;
+    }
+
+    if (!user) {
+      setSaveError("動画を保存するにはログインが必要です。ログイン後に再度撮影してください。");
       return;
     }
 
@@ -271,7 +281,7 @@ export default function CaptureMetaPage() {
       {/* Video preview */}
       <div className="relative overflow-hidden rounded-[18px] bg-black">
         <video src={videoUrl} className="aspect-[16/9] w-full object-cover" controls playsInline />
-        <div className="absolute bottom-2 right-2 rounded-full bg-black/50 px-2 py-0.5 text-[10px] font-metric text-white/80 backdrop-blur-sm">
+        <div className="absolute bottom-2 right-2 rounded-full bg-black/50 px-2 py-0.5 text-xs font-metric text-white/80 backdrop-blur-sm">
           {fmtDuration(duration)}
         </div>
       </div>

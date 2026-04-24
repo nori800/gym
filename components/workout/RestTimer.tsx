@@ -137,7 +137,8 @@ export function RestTimer({ defaultSeconds = 90, onComplete }: RestTimerProps) {
       <button
         type="button"
         onClick={() => setCompact(false)}
-        className="fixed bottom-24 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-full bg-inverse px-4 py-2.5 shadow-lg shadow-black/15 transition-all active:scale-95"
+        className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom,0px))] left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-full bg-inverse px-4 py-2.5 shadow-lg shadow-black/15 transition-all active:scale-95"
+        aria-label={`休憩タイマー 残り${fmtTime(remaining)}`}
       >
         <div className="relative h-5 w-5">
           <svg width={20} height={20} viewBox="0 0 20 20">
@@ -171,7 +172,7 @@ export function RestTimer({ defaultSeconds = 90, onComplete }: RestTimerProps) {
     <div className="overflow-hidden rounded-[18px] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04),0_0_0_1px_rgba(0,0,0,0.03)]">
       <div className="px-4 pt-4 pb-1">
         <div className="flex items-center justify-between">
-          <p className="text-[10px] font-title uppercase tracking-[0.12em] text-muted">
+          <p className="text-xs font-title uppercase tracking-[0.12em] text-muted">
             レストタイマー
           </p>
           <button
@@ -262,7 +263,7 @@ export function RestTimer({ defaultSeconds = 90, onComplete }: RestTimerProps) {
             key={s}
             type="button"
             onClick={() => selectPreset(s)}
-            className={`rounded-full px-3 py-1.5 text-[11px] font-label transition-colors ${
+            className={`rounded-full px-3 py-1.5 text-xs font-label transition-colors ${
               totalSeconds === s && !running
                 ? "bg-inverse text-on-inverse"
                 : "bg-surface text-secondary active:bg-chip"
@@ -276,7 +277,7 @@ export function RestTimer({ defaultSeconds = 90, onComplete }: RestTimerProps) {
       {/* Custom time + auto-start */}
       <div className="flex items-center justify-between border-t border-border px-4 py-3">
         <div className="flex items-center gap-2">
-          <span className="text-[11px] text-secondary">カスタム</span>
+          <span className="text-xs text-secondary">カスタム</span>
           <Stepper
             value={totalSeconds}
             onChange={handleCustomChange}
@@ -287,7 +288,7 @@ export function RestTimer({ defaultSeconds = 90, onComplete }: RestTimerProps) {
             label="秒数"
           />
         </div>
-        <label className="flex items-center gap-2 text-[11px] text-secondary">
+        <label className="flex items-center gap-2 text-xs text-secondary">
           <span>自動開始</span>
           <button
             type="button"

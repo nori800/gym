@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ChevronDown, Video as VideoIcon, Loader2, LogIn, GitCompare } from "lucide-react";
-import { EXERCISE_TYPES } from "@/lib/mocks/exercises";
+import { EXERCISE_TYPES } from "@/lib/data/exercises";
 import { formatDate } from "@/lib/utils/formatDate";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { createClient } from "@/lib/supabase/client";
@@ -19,6 +19,7 @@ function VideosPageInner() {
 
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>("all");
   const [sort, setSort] = useState<SortKey>("newest");
   const [sessionTitle, setSessionTitle] = useState<string | null>(null);
@@ -32,12 +33,18 @@ function VideosPageInner() {
       return;
     }
     const supabase = createClient();
+    setFetchError(null);
     supabase
       .from("videos")
       .select("*")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (error) {
+          setFetchError("動画の取得に失敗しました。再読み込みしてください。");
+          setLoading(false);
+          return;
+        }
         setVideos(
           (data ?? []).map((v) => ({
             id: v.id,
@@ -136,6 +143,12 @@ function VideosPageInner() {
         <p className="text-xs font-caption uppercase tracking-[0.12em] text-muted">Library</p>
         <h1 className="mt-0.5 text-[22px] font-bold tracking-tight">動画ライブラリ</h1>
       </div>
+
+      {fetchError && (
+        <div className="rounded-xl bg-danger/10 px-4 py-3">
+          <p className="text-sm font-bold text-danger">{fetchError}</p>
+        </div>
+      )}
 
       {sessionFilter && (
         <div className="flex items-center justify-between gap-3 rounded-xl bg-chip px-3 py-2.5">

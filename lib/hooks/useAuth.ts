@@ -11,8 +11,15 @@ export function useAuth() {
   useEffect(() => {
     const supabase = createClient();
 
-    supabase.auth.getUser().then(({ data }) => {
-      setUser(data.user);
+    supabase.auth.getUser().then(({ data, error }) => {
+      if (error) {
+        console.error("[useAuth] getUser error:", error.message);
+      }
+      setUser(data?.user ?? null);
+      setLoading(false);
+    }).catch((err) => {
+      console.error("[useAuth] getUser failed:", err);
+      setUser(null);
       setLoading(false);
     });
 

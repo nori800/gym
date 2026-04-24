@@ -87,7 +87,7 @@ export function Stepper({
           className="bg-inverse text-center text-base font-bold text-on-inverse transition-opacity active:opacity-80"
         >
           {value}
-          {suffix && <span className="ml-0.5 text-[11px] font-normal text-on-inverse/60">{suffix}</span>}
+          {suffix && <span className="ml-0.5 text-xs font-normal text-on-inverse/60">{suffix}</span>}
         </button>
       )}
       <button

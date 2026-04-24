@@ -64,23 +64,27 @@ export async function GET(request: NextRequest) {
 
   const supabase = await createServerSupabaseClient();
 
-  const { data: link, error } = await supabase
-    .from("shared_links")
-    .select("*")
-    .eq("token", token)
-    .single();
+  type SharedLinkRow = {
+    id: string;
+    user_id: string;
+    video_id: string | null;
+    workout_id: string | null;
+    token: string;
+    expires_at: string;
+    created_at: string;
+  };
+
+  // Use security-definer function to bypass RLS safely with token-based access
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: links, error } = await (supabase.rpc as any)("get_shared_link_by_token", { p_token: token });
+
+  const rows = links as SharedLinkRow[] | null;
+  const link = rows?.[0] ?? null;
 
   if (error || !link) {
     return NextResponse.json(
       { error: "共有リンクが見つかりません" },
       { status: 404 },
-    );
-  }
-
-  if (link.expires_at && new Date(link.expires_at) < new Date()) {
-    return NextResponse.json(
-      { error: "共有リンクの有効期限が切れています" },
-      { status: 410 },
     );
   }
 
@@ -97,8 +101,8 @@ export async function GET(request: NextRequest) {
 
   if (link.workout_id) {
     const { data: workout } = await supabase
-      .from("workout_logs")
-      .select("id, log_date, exercise_type, weight, reps, sets, rpe, note")
+      .from("workouts")
+      .select("id, title, workout_date, blocks_json, total_sets, total_volume")
       .eq("id", link.workout_id)
       .single();
     result.workout = workout;

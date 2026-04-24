@@ -71,7 +71,7 @@ export default function SettingsPage() {
         <div className="flex-1">
           <p className="text-sm font-title">{user?.email ?? "ゲストユーザー"}</p>
           {user && (
-            <p className="mt-0.5 text-[11px] text-muted">ログイン中</p>
+            <p className="mt-0.5 text-xs text-muted">ログイン中</p>
           )}
         </div>
         {user ? (
@@ -291,7 +291,11 @@ function ProfileForm({ userId, onToast }: { userId: string; onToast: (msg: strin
       .select("display_name, height, weight, goal, dominant_side, favorite_exercises, role")
       .eq("user_id", userId)
       .single()
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (error) {
+          console.error("[settings] profile fetch error:", error.message);
+          onToast("プロフィールの取得に失敗しました", "error");
+        }
         if (data) {
           setName(data.display_name || "");
           setHeight(data.height != null ? String(data.height) : "");
@@ -460,11 +464,14 @@ type MenuItemProps = {
 
 function MenuItem({ icon: Icon, label, sub }: MenuItemProps) {
   return (
-    <div className="flex min-h-[62px] w-full items-center gap-3.5 px-[18px] text-left">
+    <button
+      type="button"
+      className="flex min-h-[62px] w-full items-center gap-3.5 px-[18px] text-left transition-colors active:bg-surface"
+    >
       <Icon size={18} strokeWidth={1.5} className="text-secondary" />
       <span className="flex-1 text-lg font-semibold text-primary">{label}</span>
       {sub && <span className="text-sm text-muted">{sub}</span>}
       <ChevronRight size={16} strokeWidth={1.5} className="text-muted" />
-    </div>
+    </button>
   );
 }

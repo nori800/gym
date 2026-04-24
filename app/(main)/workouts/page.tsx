@@ -286,7 +286,7 @@ function HistoryCard({
               <Link
                 href={`/videos?session=${entry.id}`}
                 onClick={(e) => e.stopPropagation()}
-                className="mt-2 inline-flex items-center gap-1 rounded-full bg-chip px-2.5 py-1 text-[10px] font-extrabold text-secondary transition-colors active:bg-border"
+                className="mt-2 inline-flex items-center gap-1 rounded-full bg-chip px-2.5 py-1 text-xs font-extrabold text-secondary transition-colors active:bg-border"
               >
                 <Video size={11} strokeWidth={2} className="shrink-0" />
                 動画 {videoCount}
@@ -295,7 +295,7 @@ function HistoryCard({
           </div>
           <div className="flex shrink-0 flex-wrap justify-end gap-1">
             {entry.categories.map((c) => (
-              <span key={c} className="rounded-full bg-chip px-2.5 py-1 text-[10px] font-extrabold text-secondary">{c}</span>
+              <span key={c} className="rounded-full bg-chip px-2.5 py-1 text-xs font-extrabold text-secondary">{c}</span>
             ))}
           </div>
         </div>
@@ -384,7 +384,7 @@ function WorkoutDetailSheet({
               )}
               <div className="mt-4 flex flex-wrap gap-1.5">
                 {entry.categories.map((c) => (
-                  <span key={c} className="rounded-full bg-chip px-3 py-1.5 text-[11px] font-extrabold text-secondary">{c}</span>
+                  <span key={c} className="rounded-full bg-chip px-3 py-1.5 text-xs font-extrabold text-secondary">{c}</span>
                 ))}
               </div>
 
@@ -421,9 +421,9 @@ function Metric({ value, unit, label }: { value: number | string; unit: string; 
     <div className="text-center">
       <p className="flex items-baseline justify-center gap-0.5">
         <span className="text-lg font-metric leading-none">{value}</span>
-        <span className="text-[10px] font-caption text-muted">{unit}</span>
+        <span className="text-xs font-caption text-muted">{unit}</span>
       </p>
-      <p className="mt-1 text-[10px] font-caption text-muted">{label}</p>
+      <p className="mt-1 text-xs font-caption text-muted">{label}</p>
     </div>
   );
 }

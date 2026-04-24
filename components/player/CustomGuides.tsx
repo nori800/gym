@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef } from "react";
+import { useCallback, useState } from "react";
 
 export interface Guide {
   id: string;
@@ -24,7 +24,7 @@ export function CustomGuides({
   containerWidth,
   containerHeight,
 }: CustomGuidesProps) {
-  const draggingRef = useRef<string | null>(null);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
 
   const addGuide = useCallback(
     (type: "horizontal" | "vertical") => {
@@ -56,7 +56,7 @@ export function CustomGuides({
   const handlePointerDown = useCallback(
     (e: React.PointerEvent, id: string) => {
       e.stopPropagation();
-      draggingRef.current = id;
+      setDraggingId(id);
       (e.target as SVGElement).setPointerCapture(e.pointerId);
     },
     [],
@@ -64,11 +64,11 @@ export function CustomGuides({
 
   const handlePointerMove = useCallback(
     (e: React.PointerEvent) => {
-      if (!draggingRef.current) return;
+      if (!draggingId) return;
       const svg = (e.currentTarget as SVGSVGElement);
       const rect = svg.getBoundingClientRect();
 
-      const guide = guides.find((g) => g.id === draggingRef.current);
+      const guide = guides.find((g) => g.id === draggingId);
       if (!guide) return;
 
       let position: number;
@@ -81,26 +81,26 @@ export function CustomGuides({
 
       onUpdate(
         guides.map((g) =>
-          g.id === draggingRef.current ? { ...g, position } : g,
+          g.id === draggingId ? { ...g, position } : g,
         ),
       );
     },
-    [guides, onUpdate],
+    [guides, onUpdate, draggingId],
   );
 
   const handlePointerUp = useCallback(() => {
-    draggingRef.current = null;
+    setDraggingId(null);
   }, []);
 
   return (
     <>
       {/* SVG overlay for guide lines */}
       <svg
-        className="pointer-events-none absolute inset-0 h-full w-full"
+        className="absolute inset-0 h-full w-full"
         viewBox={`0 0 ${containerWidth} ${containerHeight}`}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
-        style={{ pointerEvents: draggingRef.current ? "auto" : "none" }}
+        style={{ pointerEvents: draggingId ? "auto" : "none" }}
       >
         {guides.map((guide) => {
           const isH = guide.type === "horizontal";
@@ -151,7 +151,7 @@ export function CustomGuides({
 
         {guides.map((guide) => (
           <div key={guide.id} className="flex items-center gap-1.5">
-            <span className="min-w-[16px] text-[10px] text-white/60">
+            <span className="min-w-[16px] text-xs text-white/60">
               {guide.type === "horizontal" ? "H" : "V"}
             </span>
             <input
@@ -160,7 +160,7 @@ export function CustomGuides({
               onChange={(e) => updateColor(guide.id, e.target.value)}
               className="h-5 w-5 cursor-pointer rounded border-none bg-transparent"
             />
-            <span className="text-[10px] text-white/60 tabular-nums">
+            <span className="text-xs text-white/60 tabular-nums">
               {Math.round(guide.position)}%
             </span>
             <button

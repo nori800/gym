@@ -222,7 +222,7 @@ export default function CapturePage() {
               <div className="absolute bottom-3 left-1/2 z-10 -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 backdrop-blur-sm">
                 <div className="flex items-center gap-2">
                   <Pause size={12} strokeWidth={2} className="text-white" />
-                  <span className="text-[11px] font-metric text-white/80">再生中</span>
+                  <span className="text-xs font-metric text-white/80">再生中</span>
                 </div>
               </div>
             )}
@@ -254,7 +254,7 @@ export default function CapturePage() {
                 type="button"
                 onClick={handleLibrary}
                 aria-label="ライブラリから動画を選択"
-                className="flex items-center gap-1.5 rounded-full bg-black/50 px-3 py-1.5 text-[11px] font-semibold text-white backdrop-blur-sm"
+                className="flex items-center gap-1.5 rounded-full bg-black/50 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm"
               >
                 <Upload size={13} strokeWidth={1.5} />
                 ライブラリ
@@ -267,7 +267,7 @@ export default function CapturePage() {
               type="button"
               onClick={() => setGridOn((p) => !p)}
               aria-label="グリッド表示の切り替え"
-              className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold backdrop-blur-sm ${
+              className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold backdrop-blur-sm ${
                 gridOn ? "bg-white/25 text-white" : "bg-black/50 text-white/70"
               }`}
             >
@@ -307,7 +307,7 @@ export default function CapturePage() {
           </div>
         ) : (
           <div className="flex flex-col items-center gap-2.5">
-            <p className="text-[11px] font-medium text-white/50">
+            <p className="text-xs font-medium text-white/50">
               {state === "recording" ? "タップで停止" : "タップで録画開始"}
             </p>
             <button
