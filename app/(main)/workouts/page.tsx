@@ -12,7 +12,7 @@ import { useAuth } from "@/lib/hooks/useAuth";
 import { useToast } from "@/lib/hooks/useToast";
 import { createClient } from "@/lib/supabase/client";
 import { validateMemberForTrainer } from "@/lib/trainer/validateMemberForTrainer";
-import { TrainerViewingBanner } from "@/components/trainer/TrainerViewingBanner";
+import { MemberContextNav } from "@/components/trainer/MemberContextNav";
 import type { Json } from "@/types/database.types";
 
 type WorkoutHistoryEntry = {
@@ -231,11 +231,9 @@ function WorkoutsPageInner() {
       </header>
 
       {trainerMemberLabel && trainerMemberUserId && (
-        <TrainerViewingBanner
+        <MemberContextNav
           memberLabel={trainerMemberLabel}
-          suffix="の履歴を表示中（閲覧のみ）"
-          returnHref="/workouts"
-          returnLabel="自分の履歴へ"
+          memberUserId={trainerMemberUserId}
         />
       )}
 

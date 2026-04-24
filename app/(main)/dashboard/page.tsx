@@ -14,6 +14,7 @@ import {
   Users,
   Film,
   Activity,
+  Scale,
 } from "lucide-react";
 import { formatJapaneseLongDate } from "@/lib/utils/formatRecordDate";
 import { useAuth } from "@/lib/hooks/useAuth";
@@ -70,11 +71,19 @@ function getSuggestedWorkout(categories: string[]) {
   };
 }
 
+type MemberActivity = {
+  user_id: string;
+  display_name: string;
+  recentVideoCount: number;
+  recentWorkoutCount: number;
+  latestDate: string | null;
+};
+
 type TrainerSummary = {
   memberCount: number;
   recentVideos: number;
   recentWorkouts: number;
-  members: { user_id: string; display_name: string }[];
+  memberActivities: MemberActivity[];
 };
 
 const EMPTY_DATA: DashboardData = {
@@ -229,7 +238,7 @@ export default function DashboardPage() {
           memberCount: 0,
           recentVideos: 0,
           recentWorkouts: 0,
-          members: [],
+          memberActivities: [],
         });
         return;
       }
@@ -238,29 +247,69 @@ export default function DashboardPage() {
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
       const since = sevenDaysAgo.toISOString();
 
-      const [videoRes, workoutRes] = await Promise.all([
-        supabase
-          .from("videos")
-          .select("id", { count: "exact", head: true })
-          .in("user_id", memberIds)
-          .gte("created_at", since),
-        supabase
-          .from("workouts")
-          .select("id", { count: "exact", head: true })
-          .in("user_id", memberIds)
-          .gte("created_at", since),
-      ]);
+      const [videoRes, workoutRes, recentVidData, recentWoData] =
+        await Promise.all([
+          supabase
+            .from("videos")
+            .select("id", { count: "exact", head: true })
+            .in("user_id", memberIds)
+            .gte("created_at", since),
+          supabase
+            .from("workouts")
+            .select("id", { count: "exact", head: true })
+            .in("user_id", memberIds)
+            .gte("created_at", since),
+          supabase
+            .from("videos")
+            .select("user_id, created_at")
+            .in("user_id", memberIds)
+            .gte("created_at", since),
+          supabase
+            .from("workouts")
+            .select("user_id, created_at")
+            .in("user_id", memberIds)
+            .gte("created_at", since),
+        ]);
 
       if (cancelled) return;
+
+      const vidByUser: Record<string, number> = {};
+      const woByUser: Record<string, number> = {};
+      const latestByUser: Record<string, string> = {};
+
+      for (const v of recentVidData.data ?? []) {
+        vidByUser[v.user_id] = (vidByUser[v.user_id] || 0) + 1;
+        if (!latestByUser[v.user_id] || v.created_at > latestByUser[v.user_id]) {
+          latestByUser[v.user_id] = v.created_at;
+        }
+      }
+      for (const w of recentWoData.data ?? []) {
+        woByUser[w.user_id] = (woByUser[w.user_id] || 0) + 1;
+        if (!latestByUser[w.user_id] || w.created_at > latestByUser[w.user_id]) {
+          latestByUser[w.user_id] = w.created_at;
+        }
+      }
+
+      const memberActivities: MemberActivity[] = memberList
+        .map((m) => ({
+          user_id: m.user_id,
+          display_name: m.display_name || "名前未設定",
+          recentVideoCount: vidByUser[m.user_id] ?? 0,
+          recentWorkoutCount: woByUser[m.user_id] ?? 0,
+          latestDate: latestByUser[m.user_id] ?? null,
+        }))
+        .sort((a, b) => {
+          if (!a.latestDate && !b.latestDate) return 0;
+          if (!a.latestDate) return 1;
+          if (!b.latestDate) return -1;
+          return b.latestDate.localeCompare(a.latestDate);
+        });
 
       setTrainerSummary({
         memberCount: memberList.length,
         recentVideos: videoRes.count ?? 0,
         recentWorkouts: workoutRes.count ?? 0,
-        members: memberList.map((m) => ({
-          user_id: m.user_id,
-          display_name: m.display_name || "名前未設定",
-        })),
+        memberActivities,
       });
     }
 
@@ -283,6 +332,7 @@ export default function DashboardPage() {
     );
   }
 
+  const isTrainer = userRole === "trainer";
   const suggestion = getSuggestedWorkout(allCategories);
 
   return (
@@ -291,7 +341,9 @@ export default function DashboardPage() {
 
       <header className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-title tracking-tight">FormCheck</h1>
+          <h1 className="text-xl font-title tracking-tight">
+            {isTrainer ? "FormCheck Trainer" : "FormCheck"}
+          </h1>
         </div>
         <Link
           href="/settings"
@@ -306,7 +358,7 @@ export default function DashboardPage() {
       {userRole === "member" && unreadFeedback > 0 && (
         <Link
           href="/videos"
-          className="flex items-center gap-3 rounded-[18px] bg-accent/10 border border-accent/25 px-[18px] py-3 transition-all active:scale-[0.99]"
+          className="flex items-center gap-3 rounded-[18px] border border-accent/25 bg-accent/10 px-[18px] py-3 transition-all active:scale-[0.99]"
         >
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent/20">
             <Activity size={16} strokeWidth={2} className="text-primary" />
@@ -323,63 +375,94 @@ export default function DashboardPage() {
         </Link>
       )}
 
-      {/* Trainer Summary */}
-      {userRole === "trainer" && trainerSummary && (
-        <section className="space-y-3">
-          <div className="flex items-center gap-1.5 px-0.5">
-            <Users size={12} strokeWidth={2} className="text-accent" />
-            <h2 className="text-xs font-title uppercase tracking-[0.12em] text-muted">
-              トレーナーサマリー
-            </h2>
-          </div>
-          <div className="grid grid-cols-3 gap-2.5">
-            <div className="flex flex-col justify-center rounded-[18px] bg-white p-4 shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
-              <p className="text-xs font-title uppercase tracking-[0.12em] text-muted">メンバー</p>
-              <p className="mt-2 flex items-baseline gap-1">
-                <span className="text-2xl font-metric leading-none">{trainerSummary.memberCount}</span>
-                <span className="text-xs font-caption text-muted">名</span>
-              </p>
+      {/* ===== TRAINER DASHBOARD ===== */}
+      {isTrainer && trainerSummary && (
+        <>
+          {/* Summary cards */}
+          <section className="space-y-3">
+            <div className="flex items-center gap-1.5 px-0.5">
+              <Users size={12} strokeWidth={2} className="text-accent" />
+              <h2 className="text-xs font-title uppercase tracking-[0.12em] text-muted">
+                メンバーの活動（7日間）
+              </h2>
             </div>
-            <div className="flex flex-col justify-center rounded-[18px] bg-white p-4 shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
-              <p className="text-xs font-title uppercase tracking-[0.12em] text-muted">新着動画</p>
-              <p className="mt-2 flex items-baseline gap-1">
-                <span className="text-2xl font-metric leading-none">{trainerSummary.recentVideos}</span>
-                <span className="text-xs font-caption text-muted">本/7日</span>
-              </p>
+            <div className="grid grid-cols-3 gap-2.5">
+              <div className="flex flex-col justify-center rounded-[18px] bg-white p-4 shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
+                <p className="text-xs font-title uppercase tracking-[0.12em] text-muted">メンバー</p>
+                <p className="mt-2 flex items-baseline gap-1">
+                  <span className="text-2xl font-metric leading-none">{trainerSummary.memberCount}</span>
+                  <span className="text-xs font-caption text-muted">名</span>
+                </p>
+              </div>
+              <div className="flex flex-col justify-center rounded-[18px] bg-white p-4 shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
+                <p className="text-xs font-title uppercase tracking-[0.12em] text-muted">新着動画</p>
+                <p className="mt-2 flex items-baseline gap-1">
+                  <span className="text-2xl font-metric leading-none">{trainerSummary.recentVideos}</span>
+                  <span className="text-xs font-caption text-muted">本</span>
+                </p>
+              </div>
+              <div className="flex flex-col justify-center rounded-[18px] bg-white p-4 shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
+                <p className="text-xs font-title uppercase tracking-[0.12em] text-muted">WO</p>
+                <p className="mt-2 flex items-baseline gap-1">
+                  <span className="text-2xl font-metric leading-none">{trainerSummary.recentWorkouts}</span>
+                  <span className="text-xs font-caption text-muted">件</span>
+                </p>
+              </div>
             </div>
-            <div className="flex flex-col justify-center rounded-[18px] bg-white p-4 shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
-              <p className="text-xs font-title uppercase tracking-[0.12em] text-muted">WO</p>
-              <p className="mt-2 flex items-baseline gap-1">
-                <span className="text-2xl font-metric leading-none">{trainerSummary.recentWorkouts}</span>
-                <span className="text-xs font-caption text-muted">件/7日</span>
-              </p>
-            </div>
-          </div>
-          {trainerSummary.members.length > 0 && (
-            <div className="space-y-1.5">
-              {trainerSummary.members.slice(0, 5).map((m) => (
-                <Link
-                  key={m.user_id}
-                  href={`/videos?member=${encodeURIComponent(m.user_id)}`}
-                  className="flex items-center gap-3 rounded-[14px] bg-white px-4 py-3 shadow-[0_0_0_1px_rgba(0,0,0,.04)] transition-all active:scale-[0.99]"
-                >
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent/10">
-                    <Users size={14} strokeWidth={1.5} className="text-primary" />
-                  </div>
-                  <span className="flex-1 truncate text-sm font-bold">{m.display_name}</span>
-                  <ChevronRight size={14} strokeWidth={1.5} className="text-muted" />
-                </Link>
-              ))}
-              {trainerSummary.members.length > 5 && (
+          </section>
+
+          {/* Member activity list */}
+          {trainerSummary.memberActivities.length > 0 && (
+            <section className="space-y-3">
+              <div className="flex items-center justify-between px-0.5">
+                <h2 className="text-xs font-title uppercase tracking-[0.12em] text-muted">
+                  メンバー
+                </h2>
                 <Link
                   href="/trainer"
-                  className="block text-center text-xs font-bold text-secondary hover:text-primary"
+                  className="flex items-center gap-0.5 text-xs font-title text-secondary transition-colors active:text-primary"
                 >
-                  すべてのメンバーを見る →
+                  すべて見る
+                  <ChevronRight size={14} strokeWidth={1.5} />
                 </Link>
-              )}
-            </div>
+              </div>
+              <div className="space-y-2">
+                {trainerSummary.memberActivities.slice(0, 6).map((m) => (
+                  <Link
+                    key={m.user_id}
+                    href={`/trainer/members/${m.user_id}`}
+                    className="flex items-center gap-3 rounded-[18px] bg-white px-[18px] py-3.5 shadow-[0_0_0_1px_rgba(0,0,0,.04)] transition-all active:scale-[0.99]"
+                  >
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent/10 text-sm font-bold text-primary">
+                      {m.display_name.charAt(0)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-bold tracking-tight">{m.display_name}</p>
+                      <div className="mt-0.5 flex items-center gap-3 text-xs text-secondary">
+                        {m.recentVideoCount > 0 && (
+                          <span className="flex items-center gap-1">
+                            <Film size={11} strokeWidth={1.5} />
+                            {m.recentVideoCount}
+                          </span>
+                        )}
+                        {m.recentWorkoutCount > 0 && (
+                          <span className="flex items-center gap-1">
+                            <Dumbbell size={11} strokeWidth={1.5} />
+                            {m.recentWorkoutCount}
+                          </span>
+                        )}
+                        {!m.recentVideoCount && !m.recentWorkoutCount && (
+                          <span>最近の活動なし</span>
+                        )}
+                      </div>
+                    </div>
+                    <ChevronRight size={14} strokeWidth={1.5} className="shrink-0 text-muted" />
+                  </Link>
+                ))}
+              </div>
+            </section>
           )}
+
           {trainerSummary.memberCount === 0 && (
             <Link
               href="/trainer"
@@ -389,229 +472,242 @@ export default function DashboardPage() {
                 <Users size={18} strokeWidth={1.5} className="text-primary" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-bold tracking-tight">メンバーを招待</p>
-                <p className="mt-0.5 text-xs text-secondary">トレーナーページからメンバーを追加しましょう</p>
+                <p className="text-sm font-bold tracking-tight">メンバーを追加</p>
+                <p className="mt-0.5 text-xs text-secondary">メンバーページからユーザーを検索して追加しましょう</p>
               </div>
               <ChevronRight size={16} strokeWidth={1.5} className="shrink-0 text-muted" />
             </Link>
           )}
-        </section>
-      )}
 
-      {!user ? (
-        <section>
-          <div className="rounded-[18px] bg-white p-[18px] shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-accent/10">
-                <LogIn size={18} strokeWidth={1.5} className="text-primary" />
-              </div>
-              <div>
-                <p className="text-sm font-bold tracking-tight">
-                  ログインして始めよう
-                </p>
-                <p className="mt-1 text-xs leading-relaxed text-secondary">
-                  ログインするとワークアウトや体重の記録を保存できます。
+          {/* Trainer's own stats - compact */}
+          <section className="space-y-3">
+            <h2 className="px-0.5 text-xs font-title uppercase tracking-[0.12em] text-muted">
+              自分のトレーニング
+            </h2>
+            <div className="grid grid-cols-3 gap-2.5">
+              <div className="flex flex-col justify-center rounded-[14px] bg-white p-3 shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
+                <p className="text-[10px] font-title uppercase tracking-[0.12em] text-muted">今週</p>
+                <p className="mt-1 flex items-baseline gap-0.5">
+                  <span className="text-lg font-metric leading-none">{data.weekSessions}</span>
+                  <span className="text-[10px] font-caption text-muted">回</span>
                 </p>
               </div>
-            </div>
-            <Link
-              href="/login"
-              className="mt-4 flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-inverse text-sm font-extrabold tracking-wide text-on-inverse transition-all active:scale-[0.98]"
-            >
-              ログイン / サインアップ
-            </Link>
-          </div>
-        </section>
-      ) : (
-        <>
-          <section className="grid grid-cols-2 gap-2.5">
-            <div className="flex flex-col justify-center rounded-[18px] bg-white p-4 shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
-              <p className="text-xs font-title uppercase tracking-[0.12em] text-muted">
-                今週
-              </p>
-              <p className="mt-2 flex items-baseline gap-1">
-                <span className="text-3xl font-metric leading-none">
-                  {data.weekSessions}
-                </span>
-                <span className="text-sm font-caption text-muted">
-                  セッション
-                </span>
-              </p>
-            </div>
-            <div className="flex flex-col justify-center rounded-[18px] bg-white p-4 shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
-              <p className="text-xs font-title uppercase tracking-[0.12em] text-muted">
-                体重
-              </p>
-              <p className="mt-2 flex items-baseline gap-1">
-                <span className="text-3xl font-metric leading-none">
-                  {data.latestWeight?.weight ?? "—"}
-                </span>
-                <span className="text-sm font-caption text-muted">kg</span>
-              </p>
-              {data.latestWeight && (
-                <p className="mt-1 text-xs text-secondary">
-                  {formatJapaneseLongDate(data.latestWeight.date)}
+              <div className="flex flex-col justify-center rounded-[14px] bg-white p-3 shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
+                <p className="text-[10px] font-title uppercase tracking-[0.12em] text-muted">体重</p>
+                <p className="mt-1 flex items-baseline gap-0.5">
+                  <span className="text-lg font-metric leading-none">
+                    {data.latestWeight?.weight ?? "—"}
+                  </span>
+                  <span className="text-[10px] font-caption text-muted">kg</span>
                 </p>
-              )}
+              </div>
+              <div className="flex flex-col justify-center rounded-[14px] bg-white p-3 shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
+                <p className="text-[10px] font-title uppercase tracking-[0.12em] text-muted">動画</p>
+                <p className="mt-1 flex items-baseline gap-0.5">
+                  <span className="text-lg font-metric leading-none">{data.videoCount}</span>
+                  <span className="text-[10px] font-caption text-muted">本</span>
+                </p>
+              </div>
             </div>
           </section>
-
-          {suggestion && (
-            <section>
-              <div className="flex items-center gap-1.5 px-0.5">
-                <Sparkles size={12} strokeWidth={2} className="text-accent" />
-                <h2 className="text-xs font-title uppercase tracking-[0.12em] text-muted">
-                  今日のおすすめ
-                </h2>
-              </div>
-              <Link
-                href="/workouts/edit"
-                className="mt-2.5 flex items-center gap-3.5 rounded-[18px] bg-white px-[18px] py-4 shadow-[0_0_0_1px_rgba(0,0,0,.04)] transition-all duration-150 active:scale-[0.99]"
-              >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-accent/10">
-                  <Dumbbell
-                    size={18}
-                    strokeWidth={1.5}
-                    className="text-primary"
-                  />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-bold tracking-tight">
-                    {suggestion.suggestion}
-                  </p>
-                  <p className="mt-0.5 text-xs text-secondary">
-                    {suggestion.reason}
-                  </p>
-                </div>
-                <ChevronRight
-                  size={16}
-                  strokeWidth={1.5}
-                  className="shrink-0 text-muted"
-                />
-              </Link>
-            </section>
-          )}
-
-          {data.recentWorkouts.length > 0 ? (
-            <section className="space-y-3">
-              <div className="flex items-center justify-between px-0.5">
-                <h2 className="text-xs font-title uppercase tracking-[0.12em] text-muted">
-                  最近のワークアウト
-                </h2>
-                <Link
-                  href="/workouts"
-                  className="flex items-center gap-0.5 text-xs font-title text-secondary transition-colors active:text-primary"
-                >
-                  すべて見る
-                  <ChevronRight size={14} strokeWidth={1.5} />
-                </Link>
-              </div>
-              <div className="overflow-hidden rounded-[18px] bg-white shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
-                {data.recentWorkouts.map((workout, i) => (
-                  <Link
-                    key={workout.id}
-                    href={`/workouts/${workout.id}`}
-                    className={`flex items-center gap-3.5 px-[18px] py-3.5 transition-colors duration-150 active:bg-surface ${i > 0 ? "border-t border-border" : ""}`}
-                  >
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-surface">
-                      <TrendingUp
-                        size={18}
-                        strokeWidth={1.5}
-                        className="text-primary"
-                      />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-bold tracking-tight">
-                        {workout.title}
-                      </p>
-                      <p className="mt-0.5 text-xs text-secondary">
-                        {formatJapaneseLongDate(workout.date)} ·{" "}
-                        {workout.durationMin}分 · {workout.totalSets}セット
-                      </p>
-                    </div>
-                    <ChevronRight
-                      size={16}
-                      strokeWidth={1.5}
-                      className="shrink-0 text-muted"
-                    />
-                  </Link>
-                ))}
-              </div>
-            </section>
-          ) : (
-            <section className="space-y-3">
-              <h2 className="px-0.5 text-xs font-title uppercase tracking-[0.12em] text-muted">
-                はじめよう
-              </h2>
-              <div className="rounded-[18px] bg-white p-[18px] shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
-                <p className="text-sm font-bold tracking-tight">
-                  {fetchError
-                    ? "データを読み込めませんでした"
-                    : "最初のワークアウトを記録しよう 💪"}
-                </p>
-                <p className="mt-1.5 text-[13px] leading-relaxed text-secondary">
-                  {fetchError
-                    ? "ネットワーク接続を確認して、もう一度お試しください。"
-                    : "種目・重量・回数を記録して、トレーニングの成果を見える化できます。"}
-                </p>
-                <Link
-                  href="/workouts/edit"
-                  className="mt-4 flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-inverse text-sm font-extrabold tracking-wide text-on-inverse transition-all active:scale-[0.98]"
-                >
-                  <Dumbbell size={16} strokeWidth={1.5} />
-                  ワークアウトを作成
-                </Link>
-              </div>
-            </section>
-          )}
         </>
       )}
 
-      <section className="space-y-3">
-        <h2 className="px-0.5 text-xs font-title uppercase tracking-[0.12em] text-muted">
-          フォームチェック
-        </h2>
-        <Link
-          href="/capture"
-          className="flex items-center gap-3.5 rounded-[18px] bg-white px-[18px] py-4 shadow-[0_0_0_1px_rgba(0,0,0,.04)] transition-all duration-150 active:scale-[0.99]"
-        >
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-accent/10">
-            <Camera size={18} strokeWidth={1.5} className="text-primary" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-bold tracking-tight">撮影して記録</p>
-            <p className="mt-0.5 text-xs text-secondary">
-              フォームを撮影してチェック
-            </p>
-          </div>
-          <ChevronRight
-            size={16}
-            strokeWidth={1.5}
-            className="shrink-0 text-muted"
-          />
-        </Link>
-        <Link
-          href="/videos"
-          className="flex items-center gap-3.5 rounded-[18px] bg-white px-[18px] py-4 shadow-[0_0_0_1px_rgba(0,0,0,.04)] transition-all duration-150 active:scale-[0.99]"
-        >
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-surface">
-            <TrendingUp size={18} strokeWidth={1.5} className="text-primary" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-bold tracking-tight">動画ライブラリ</p>
-            <p className="mt-0.5 text-xs text-secondary">
-              {data.videoCount > 0
-                ? `${data.videoCount}本の撮影動画`
-                : "撮影した動画をここで確認"}
-            </p>
-          </div>
-          <ChevronRight
-            size={16}
-            strokeWidth={1.5}
-            className="shrink-0 text-muted"
-          />
-        </Link>
-      </section>
+      {/* ===== NON-TRAINER / LOGGED-OUT VIEW ===== */}
+      {!isTrainer && (
+        <>
+          {!user ? (
+            <section>
+              <div className="rounded-[18px] bg-white p-[18px] shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-accent/10">
+                    <LogIn size={18} strokeWidth={1.5} className="text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold tracking-tight">
+                      ログインして始めよう
+                    </p>
+                    <p className="mt-1 text-xs leading-relaxed text-secondary">
+                      ログインするとワークアウトや体重の記録を保存できます。
+                    </p>
+                  </div>
+                </div>
+                <Link
+                  href="/login"
+                  className="mt-4 flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-inverse text-sm font-extrabold tracking-wide text-on-inverse transition-all active:scale-[0.98]"
+                >
+                  ログイン / サインアップ
+                </Link>
+              </div>
+            </section>
+          ) : (
+            <>
+              <section className="grid grid-cols-2 gap-2.5">
+                <div className="flex flex-col justify-center rounded-[18px] bg-white p-4 shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
+                  <p className="text-xs font-title uppercase tracking-[0.12em] text-muted">
+                    今週
+                  </p>
+                  <p className="mt-2 flex items-baseline gap-1">
+                    <span className="text-3xl font-metric leading-none">
+                      {data.weekSessions}
+                    </span>
+                    <span className="text-sm font-caption text-muted">
+                      セッション
+                    </span>
+                  </p>
+                </div>
+                <div className="flex flex-col justify-center rounded-[18px] bg-white p-4 shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
+                  <p className="text-xs font-title uppercase tracking-[0.12em] text-muted">
+                    体重
+                  </p>
+                  <p className="mt-2 flex items-baseline gap-1">
+                    <span className="text-3xl font-metric leading-none">
+                      {data.latestWeight?.weight ?? "—"}
+                    </span>
+                    <span className="text-sm font-caption text-muted">kg</span>
+                  </p>
+                  {data.latestWeight && (
+                    <p className="mt-1 text-xs text-secondary">
+                      {formatJapaneseLongDate(data.latestWeight.date)}
+                    </p>
+                  )}
+                </div>
+              </section>
+
+              {suggestion && (
+                <section>
+                  <div className="flex items-center gap-1.5 px-0.5">
+                    <Sparkles size={12} strokeWidth={2} className="text-accent" />
+                    <h2 className="text-xs font-title uppercase tracking-[0.12em] text-muted">
+                      今日のおすすめ
+                    </h2>
+                  </div>
+                  <Link
+                    href="/workouts/edit"
+                    className="mt-2.5 flex items-center gap-3.5 rounded-[18px] bg-white px-[18px] py-4 shadow-[0_0_0_1px_rgba(0,0,0,.04)] transition-all duration-150 active:scale-[0.99]"
+                  >
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-accent/10">
+                      <Dumbbell size={18} strokeWidth={1.5} className="text-primary" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-bold tracking-tight">
+                        {suggestion.suggestion}
+                      </p>
+                      <p className="mt-0.5 text-xs text-secondary">
+                        {suggestion.reason}
+                      </p>
+                    </div>
+                    <ChevronRight size={16} strokeWidth={1.5} className="shrink-0 text-muted" />
+                  </Link>
+                </section>
+              )}
+
+              {data.recentWorkouts.length > 0 ? (
+                <section className="space-y-3">
+                  <div className="flex items-center justify-between px-0.5">
+                    <h2 className="text-xs font-title uppercase tracking-[0.12em] text-muted">
+                      最近のワークアウト
+                    </h2>
+                    <Link
+                      href="/workouts"
+                      className="flex items-center gap-0.5 text-xs font-title text-secondary transition-colors active:text-primary"
+                    >
+                      すべて見る
+                      <ChevronRight size={14} strokeWidth={1.5} />
+                    </Link>
+                  </div>
+                  <div className="overflow-hidden rounded-[18px] bg-white shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
+                    {data.recentWorkouts.map((workout, i) => (
+                      <Link
+                        key={workout.id}
+                        href={`/workouts/${workout.id}`}
+                        className={`flex items-center gap-3.5 px-[18px] py-3.5 transition-colors duration-150 active:bg-surface ${i > 0 ? "border-t border-border" : ""}`}
+                      >
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-surface">
+                          <TrendingUp size={18} strokeWidth={1.5} className="text-primary" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-bold tracking-tight">
+                            {workout.title}
+                          </p>
+                          <p className="mt-0.5 text-xs text-secondary">
+                            {formatJapaneseLongDate(workout.date)} ·{" "}
+                            {workout.durationMin}分 · {workout.totalSets}セット
+                          </p>
+                        </div>
+                        <ChevronRight size={16} strokeWidth={1.5} className="shrink-0 text-muted" />
+                      </Link>
+                    ))}
+                  </div>
+                </section>
+              ) : (
+                <section className="space-y-3">
+                  <h2 className="px-0.5 text-xs font-title uppercase tracking-[0.12em] text-muted">
+                    はじめよう
+                  </h2>
+                  <div className="rounded-[18px] bg-white p-[18px] shadow-[0_0_0_1px_rgba(0,0,0,.04)]">
+                    <p className="text-sm font-bold tracking-tight">
+                      {fetchError
+                        ? "データを読み込めませんでした"
+                        : "最初のワークアウトを記録しよう"}
+                    </p>
+                    <p className="mt-1.5 text-[13px] leading-relaxed text-secondary">
+                      {fetchError
+                        ? "ネットワーク接続を確認して、もう一度お試しください。"
+                        : "種目・重量・回数を記録して、トレーニングの成果を見える化できます。"}
+                    </p>
+                    <Link
+                      href="/workouts/edit"
+                      className="mt-4 flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-inverse text-sm font-extrabold tracking-wide text-on-inverse transition-all active:scale-[0.98]"
+                    >
+                      <Dumbbell size={16} strokeWidth={1.5} />
+                      ワークアウトを作成
+                    </Link>
+                  </div>
+                </section>
+              )}
+            </>
+          )}
+
+          <section className="space-y-3">
+            <h2 className="px-0.5 text-xs font-title uppercase tracking-[0.12em] text-muted">
+              フォームチェック
+            </h2>
+            <Link
+              href="/capture"
+              className="flex items-center gap-3.5 rounded-[18px] bg-white px-[18px] py-4 shadow-[0_0_0_1px_rgba(0,0,0,.04)] transition-all duration-150 active:scale-[0.99]"
+            >
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-accent/10">
+                <Camera size={18} strokeWidth={1.5} className="text-primary" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold tracking-tight">撮影して記録</p>
+                <p className="mt-0.5 text-xs text-secondary">
+                  フォームを撮影してチェック
+                </p>
+              </div>
+              <ChevronRight size={16} strokeWidth={1.5} className="shrink-0 text-muted" />
+            </Link>
+            <Link
+              href="/videos"
+              className="flex items-center gap-3.5 rounded-[18px] bg-white px-[18px] py-4 shadow-[0_0_0_1px_rgba(0,0,0,.04)] transition-all duration-150 active:scale-[0.99]"
+            >
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-surface">
+                <TrendingUp size={18} strokeWidth={1.5} className="text-primary" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold tracking-tight">動画ライブラリ</p>
+                <p className="mt-0.5 text-xs text-secondary">
+                  {data.videoCount > 0
+                    ? `${data.videoCount}本の撮影動画`
+                    : "撮影した動画をここで確認"}
+                </p>
+              </div>
+              <ChevronRight size={16} strokeWidth={1.5} className="shrink-0 text-muted" />
+            </Link>
+          </section>
+        </>
+      )}
     </div>
   );
 }

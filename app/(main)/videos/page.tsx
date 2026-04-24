@@ -9,7 +9,7 @@ import { formatDate } from "@/lib/utils/formatDate";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { createClient } from "@/lib/supabase/client";
 import { validateMemberForTrainer } from "@/lib/trainer/validateMemberForTrainer";
-import { TrainerViewingBanner } from "@/components/trainer/TrainerViewingBanner";
+import { MemberContextNav } from "@/components/trainer/MemberContextNav";
 import type { Video } from "@/types";
 
 type SortKey = "newest" | "oldest";
@@ -189,11 +189,9 @@ function VideosPageInner() {
       </div>
 
       {trainerMemberLabel && trainerMemberUserId && (
-        <TrainerViewingBanner
+        <MemberContextNav
           memberLabel={trainerMemberLabel}
-          suffix="の動画を表示中（トレーナー閲覧）"
-          returnHref="/videos"
-          returnLabel="自分のライブラリへ"
+          memberUserId={trainerMemberUserId}
         />
       )}
 

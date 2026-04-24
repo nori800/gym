@@ -12,26 +12,26 @@ type SearchResult = {
   is_self: boolean;
 };
 
-interface InviteSectionProps {
-  inviteQuery: string;
-  inviting: boolean;
+interface AddMemberSectionProps {
+  query: string;
+  adding: boolean;
   onQueryChange: (value: string) => void;
-  onInvite: (target: SearchResult) => void;
+  onAdd: (target: SearchResult) => void;
 }
 
-export function InviteSection({
-  inviteQuery,
-  inviting,
+export function AddMemberSection({
+  query,
+  adding,
   onQueryChange,
-  onInvite,
-}: InviteSectionProps) {
+  onAdd,
+}: AddMemberSectionProps) {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
 
   const handleSearch = useCallback(async () => {
-    const q = inviteQuery.trim();
+    const q = query.trim();
     if (q.length < 2) {
       setSearchError("2文字以上入力してください");
       return;
@@ -58,7 +58,7 @@ export function InviteSection({
     } finally {
       setSearching(false);
     }
-  }, [inviteQuery]);
+  }, [query]);
 
   return (
     <section className="mt-6">
@@ -68,16 +68,16 @@ export function InviteSection({
             <UserPlus size={18} strokeWidth={1.5} className="text-primary" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-bold tracking-tight">メンバーを招待</p>
+            <p className="text-sm font-bold tracking-tight">メンバーを追加</p>
             <p className="mt-0.5 text-xs text-secondary">
-              メールアドレスまたは表示名で検索
+              登録済みのユーザーを検索して追加します
             </p>
           </div>
         </div>
         <div className="mt-3.5 flex gap-2">
           <input
             type="text"
-            value={inviteQuery}
+            value={query}
             onChange={(e) => onQueryChange(e.target.value)}
             placeholder="メールアドレスまたは名前（2文字以上）"
             className="min-h-[44px] flex-1 rounded-xl border border-border bg-surface px-3.5 text-sm outline-none transition-colors focus:border-primary/30 focus:ring-2 focus:ring-primary/10"
@@ -88,7 +88,7 @@ export function InviteSection({
           <button
             type="button"
             onClick={handleSearch}
-            disabled={searching || inviteQuery.trim().length < 2}
+            disabled={searching || query.trim().length < 2}
             className="flex min-h-[44px] items-center gap-1.5 rounded-xl bg-inverse px-4 text-sm font-extrabold text-on-inverse transition-all active:scale-[0.98] disabled:opacity-50"
           >
             {searching ? (
@@ -135,16 +135,16 @@ export function InviteSection({
                 ) : (
                   <button
                     type="button"
-                    onClick={() => onInvite(r)}
-                    disabled={inviting}
+                    onClick={() => onAdd(r)}
+                    disabled={adding}
                     className="flex shrink-0 items-center gap-1 rounded-lg bg-inverse px-3 py-1.5 text-xs font-extrabold text-on-inverse transition-all active:scale-[0.98] disabled:opacity-50"
                   >
-                    {inviting ? (
+                    {adding ? (
                       <Loader2 size={12} className="animate-spin" />
                     ) : (
                       <UserPlus size={12} strokeWidth={2} />
                     )}
-                    招待
+                    追加
                   </button>
                 )}
               </div>

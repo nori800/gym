@@ -12,7 +12,7 @@ import { useAuth } from "@/lib/hooks/useAuth";
 import { useToast } from "@/lib/hooks/useToast";
 import { createClient } from "@/lib/supabase/client";
 import { validateMemberForTrainer } from "@/lib/trainer/validateMemberForTrainer";
-import { TrainerViewingBanner } from "@/components/trainer/TrainerViewingBanner";
+import { MemberContextNav } from "@/components/trainer/MemberContextNav";
 import type { BodyLog } from "@/types";
 
 function BodyPageInner() {
@@ -213,11 +213,9 @@ function BodyPageInner() {
       </header>
 
       {trainerMemberLabel && trainerMemberUserId && (
-        <TrainerViewingBanner
+        <MemberContextNav
           memberLabel={trainerMemberLabel}
-          suffix="の記録を表示中（閲覧のみ）"
-          returnHref="/body"
-          returnLabel="自分のログへ"
+          memberUserId={trainerMemberUserId}
         />
       )}
 

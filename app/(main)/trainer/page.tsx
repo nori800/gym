@@ -7,8 +7,8 @@ import { useAuth } from "@/lib/hooks/useAuth";
 import { useToast } from "@/lib/hooks/useToast";
 import { AppToast } from "@/components/common/AppToast";
 import { createClient } from "@/lib/supabase/client";
-import { InviteSection, type SearchResult } from "@/components/trainer/InviteSection";
-import { MemberCard, type MemberProfile, type MemberDetail } from "@/components/trainer/MemberCard";
+import { AddMemberSection, type SearchResult } from "@/components/trainer/AddMemberSection";
+import { MemberCard, type MemberProfile } from "@/components/trainer/MemberCard";
 
 export default function TrainerPage() {
   const { user, loading: authLoading } = useAuth();
@@ -17,12 +17,8 @@ export default function TrainerPage() {
   const [role, setRole] = useState<string | null>(null);
   const [members, setMembers] = useState<MemberProfile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [inviting, setInviting] = useState(false);
-  const [removingId, setRemovingId] = useState<string | null>(null);
-  const [expandedMember, setExpandedMember] = useState<string | null>(null);
-  const [memberDetail, setMemberDetail] = useState<Record<string, MemberDetail>>({});
-  const [detailLoading, setDetailLoading] = useState<string | null>(null);
+  const [addQuery, setAddQuery] = useState("");
+  const [adding, setAdding] = useState(false);
 
   const fetchRole = useCallback(async () => {
     if (!user) return;
@@ -117,72 +113,20 @@ export default function TrainerPage() {
     }
   }, [role, router]);
 
-  const fetchMemberDetail = useCallback(
-    async (userId: string) => {
-      if (memberDetail[userId]) return;
-      setDetailLoading(userId);
-      const supabase = createClient();
-
-      const [workoutRes, videoRes] = await Promise.all([
-        supabase
-          .from("workouts")
-          .select("id, title, workout_date")
-          .eq("user_id", userId)
-          .order("workout_date", { ascending: false })
-          .limit(25),
-        supabase
-          .from("videos")
-          .select("id, title, exercise_type, created_at")
-          .eq("user_id", userId)
-          .order("created_at", { ascending: false })
-          .limit(25),
-      ]);
-
-      if (workoutRes.error) {
-        console.error("[trainer] member workout fetch error:", workoutRes.error.message);
-      }
-      if (videoRes.error) {
-        console.error("[trainer] member video fetch error:", videoRes.error.message);
-      }
-
-      setMemberDetail((prev) => ({
-        ...prev,
-        [userId]: {
-          recentWorkouts: workoutRes.data ?? [],
-          recentVideos: videoRes.data ?? [],
-        },
-      }));
-      setDetailLoading(null);
-    },
-    [memberDetail],
-  );
-
-  const toggleMember = useCallback(
-    (userId: string) => {
-      if (expandedMember === userId) {
-        setExpandedMember(null);
-      } else {
-        setExpandedMember(userId);
-        fetchMemberDetail(userId);
-      }
-    },
-    [expandedMember, fetchMemberDetail],
-  );
-
-  const handleInvite = useCallback(async (target: SearchResult) => {
+  const handleAdd = useCallback(async (target: SearchResult) => {
     if (!user) return;
-    setInviting(true);
+    setAdding(true);
     const supabase = createClient();
 
     if (target.is_self) {
-      show("自分自身を招待することはできません", "error");
-      setInviting(false);
+      show("自分自身を追加することはできません", "error");
+      setAdding(false);
       return;
     }
 
     if (target.has_trainer) {
       show("このユーザーは既に別のトレーナーに紐づいています", "error");
-      setInviting(false);
+      setAdding(false);
       return;
     }
 
@@ -192,37 +136,14 @@ export default function TrainerPage() {
       .eq("id", target.id);
 
     if (error) {
-      show("招待に失敗しました", "error");
+      show("追加に失敗しました", "error");
     } else {
       show(`${target.display_name || "メンバー"} を追加しました`, "success");
-      setInviteEmail("");
+      setAddQuery("");
       fetchMembers();
     }
-    setInviting(false);
+    setAdding(false);
   }, [user, show, fetchMembers]);
-
-  const handleRemove = useCallback(
-    async (member: MemberProfile) => {
-      if (!user) return;
-      setRemovingId(member.id);
-      const supabase = createClient();
-
-      const { error } = await supabase
-        .from("profiles")
-        .update({ trainer_id: null })
-        .eq("id", member.id)
-        .eq("trainer_id", user.id);
-
-      if (error) {
-        show("解除に失敗しました", "error");
-      } else {
-        show(`${member.display_name} を解除しました`, "success");
-        fetchMembers();
-      }
-      setRemovingId(null);
-    },
-    [user, show, fetchMembers],
-  );
 
   if (loading || authLoading || (user && role === null)) {
     return (
@@ -245,18 +166,18 @@ export default function TrainerPage() {
       <header className="flex items-end justify-between">
         <div>
           <p className="text-xs font-title uppercase tracking-[0.12em] text-muted">Trainer</p>
-          <h1 className="mt-1 text-xl font-title tracking-tight">メンバー管理</h1>
+          <h1 className="mt-1 text-xl font-title tracking-tight">メンバー</h1>
         </div>
         {!isEmpty && (
           <p className="pb-1 text-xs font-caption text-muted">{members.length} 名</p>
         )}
       </header>
 
-      <InviteSection
-        inviteQuery={inviteEmail}
-        inviting={inviting}
-        onQueryChange={setInviteEmail}
-        onInvite={handleInvite}
+      <AddMemberSection
+        query={addQuery}
+        adding={adding}
+        onQueryChange={setAddQuery}
+        onAdd={handleAdd}
       />
 
       {isEmpty ? (
@@ -266,7 +187,7 @@ export default function TrainerPage() {
           </div>
           <p className="mt-5 text-[15px] font-bold">メンバーがいません</p>
           <p className="mt-2 max-w-[240px] text-center text-sm leading-relaxed text-secondary">
-            メンバーを招待して、ワークアウトや動画を閲覧・管理しましょう。
+            ユーザーを検索してメンバーとして追加しましょう。
           </p>
         </div>
       ) : (
@@ -276,16 +197,7 @@ export default function TrainerPage() {
           </h2>
           <div className="space-y-2.5">
             {members.map((member) => (
-              <MemberCard
-                key={member.id}
-                member={member}
-                isExpanded={expandedMember === member.user_id}
-                detail={memberDetail[member.user_id]}
-                isLoadingDetail={detailLoading === member.user_id}
-                removingId={removingId}
-                onToggle={() => toggleMember(member.user_id)}
-                onRemove={() => handleRemove(member)}
-              />
+              <MemberCard key={member.id} member={member} />
             ))}
           </div>
         </section>

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Camera, Dumbbell, Scale, Film, Users } from "lucide-react";
+import { Home, Camera, Dumbbell, Scale, Film, Users, Settings } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 const NAV_LEFT = [
@@ -24,8 +24,8 @@ const NAV_RIGHT_DEFAULT = [
 ] as const;
 
 const NAV_RIGHT_TRAINER = [
-  { href: "/videos", label: "動画", icon: Film, match: ["/videos"] },
-  { href: "/trainer", label: "管理", icon: Users, match: ["/trainer", "/body"] },
+  { href: "/trainer", label: "メンバー", icon: Users, match: ["/trainer"] },
+  { href: "/settings", label: "設定", icon: Settings, match: ["/settings"] },
 ] as const;
 
 function isPathActive(pathname: string, match: readonly string[]) {
@@ -126,7 +126,6 @@ export function BottomNav({ userRole }: { userRole?: string }) {
           <TabItem key={item.href} {...item} pathname={pathname} />
         ))}
 
-        {/* Center: primary action — form check capture */}
         <div className="flex w-[72px] shrink-0 flex-col items-center justify-end pb-0.5">
           <Link
             href={NAV_CENTER.href}
