@@ -32,6 +32,8 @@ export default function CaptureMetaPage() {
   const [phase, setPhase] = useState<Phase>("input");
   const [recentWorkouts, setRecentWorkouts] = useState<RecentWorkout[]>([]);
 
+  const [blobError, setBlobError] = useState(false);
+
   useEffect(() => {
     const url = sessionStorage.getItem("capturedVideoUrl");
     const dur = sessionStorage.getItem("capturedDuration");
@@ -43,9 +45,24 @@ export default function CaptureMetaPage() {
     setDuration(dur ? parseInt(dur, 10) : 0);
 
     fetch(url)
-      .then((r) => r.blob())
-      .then(setVideoBlob)
-      .catch(() => {});
+      .then((r) => {
+        if (!r.ok) throw new Error("blob fetch failed");
+        return r.blob();
+      })
+      .then((blob) => {
+        if (blob.size === 0) throw new Error("empty blob");
+        setVideoBlob(blob);
+      })
+      .catch(() => {
+        setBlobError(true);
+      });
+
+    return () => {
+      // メタページ離脱時に blob URL を解放
+      if (url.startsWith("blob:")) {
+        URL.revokeObjectURL(url);
+      }
+    };
   }, [router]);
 
   useEffect(() => {
@@ -103,46 +120,58 @@ export default function CaptureMetaPage() {
     [user, videoBlob, exercise, weight, duration, memo, linkedWorkoutId],
   );
 
+  const [saveError, setSaveError] = useState<string | null>(null);
+
   const handleSave = useCallback(async () => {
     if (!exercise) {
       setExerciseError(true);
       return;
     }
 
+    if (user && !videoBlob) {
+      setSaveError("動画データを取得できませんでした。撮影画面に戻ってやり直してください。");
+      return;
+    }
+
     setPhase("saving");
+    setSaveError(null);
 
     if (user && videoBlob) {
       const ok = await uploadAndSave(false);
       if (!ok) {
+        setSaveError("動画のアップロードに失敗しました。もう一度お試しください。");
         setPhase("input");
         return;
       }
-    } else {
-      console.log("save set with video (guest)", { exercise, weight, reps, sets, memo, videoUrl, duration, linkedWorkoutId });
     }
 
     sessionStorage.removeItem("capturedVideoUrl");
     sessionStorage.removeItem("capturedDuration");
     setPhase("saved");
-  }, [exercise, user, videoBlob, uploadAndSave, weight, reps, sets, memo, videoUrl, duration, linkedWorkoutId]);
+  }, [exercise, user, videoBlob, uploadAndSave]);
 
   const handleVideoOnly = useCallback(async () => {
+    if (user && !videoBlob) {
+      setSaveError("動画データを取得できませんでした。撮影画面に戻ってやり直してください。");
+      return;
+    }
+
     setPhase("saving");
+    setSaveError(null);
 
     if (user && videoBlob) {
       const ok = await uploadAndSave(true);
       if (!ok) {
+        setSaveError("動画のアップロードに失敗しました。もう一度お試しください。");
         setPhase("input");
         return;
       }
-    } else {
-      console.log("save video only (guest)", { exercise, videoUrl, duration, linkedWorkoutId });
     }
 
     sessionStorage.removeItem("capturedVideoUrl");
     sessionStorage.removeItem("capturedDuration");
     router.push("/videos");
-  }, [user, videoBlob, uploadAndSave, exercise, videoUrl, duration, router, linkedWorkoutId]);
+  }, [user, videoBlob, uploadAndSave, router]);
 
   const fmtDuration = (s: number) =>
     `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
@@ -340,16 +369,37 @@ export default function CaptureMetaPage() {
         </div>
       </div>
 
+      {/* Error messages */}
+      {(blobError || saveError) && (
+        <div className="rounded-xl bg-danger/10 px-4 py-3">
+          <p className="text-sm font-bold text-danger">
+            {blobError
+              ? "動画データの読み込みに失敗しました。撮影画面に戻ってやり直してください。"
+              : saveError}
+          </p>
+          {blobError && (
+            <button
+              type="button"
+              onClick={() => router.replace("/capture")}
+              className="mt-2 text-sm font-bold text-danger underline underline-offset-2"
+            >
+              撮影画面に戻る
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Save buttons */}
       <div className="space-y-2.5">
-        <PrimaryRecordButton type="button" onClick={handleSave}>
+        <PrimaryRecordButton type="button" onClick={handleSave} disabled={blobError}>
           <Dumbbell size={16} strokeWidth={1.5} />
           記録する
         </PrimaryRecordButton>
         <button
           type="button"
           onClick={handleVideoOnly}
-          className="min-h-[44px] w-full rounded-xl text-sm font-bold text-secondary transition-colors active:bg-chip"
+          disabled={blobError}
+          className="min-h-[44px] w-full rounded-xl text-sm font-bold text-secondary transition-colors active:bg-chip disabled:opacity-40"
         >
           動画だけ保存する
         </button>

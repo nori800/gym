@@ -511,6 +511,17 @@ function WorkoutEditInner() {
                 </p>
               </div>
             </Link>
+
+            {/* Bottom save button */}
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving}
+              className="mt-6 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-inverse text-base font-extrabold tracking-wide text-on-inverse shadow-lg transition-all duration-150 active:scale-[0.97] disabled:opacity-60"
+            >
+              {saving && <Loader2 size={16} className="animate-spin" />}
+              {editId ? "ワークアウトを更新" : "ワークアウトを保存"}
+            </button>
           </>
         )}
       </div>

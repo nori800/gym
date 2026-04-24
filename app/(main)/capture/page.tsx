@@ -66,7 +66,10 @@ export default function CapturePage() {
     return () => {
       streamRef.current?.getTracks().forEach((t) => t.stop());
       if (timerRef.current) clearInterval(timerRef.current);
-      if (recordedUrlRef.current) URL.revokeObjectURL(recordedUrlRef.current);
+      // メタページへ遷移中は blob URL を破棄しない（メタページで blob を取得するため）
+      if (!proceedingRef.current && recordedUrlRef.current) {
+        URL.revokeObjectURL(recordedUrlRef.current);
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -113,8 +116,11 @@ export default function CapturePage() {
     startCamera();
   }, [revokeRecordedUrl, setRecordedUrlTracked, startCamera]);
 
+  const proceedingRef = useRef(false);
+
   const proceed = useCallback(() => {
     if (recordedUrl) {
+      proceedingRef.current = true;
       sessionStorage.setItem("capturedVideoUrl", recordedUrl);
       sessionStorage.setItem("capturedDuration", String(elapsed));
       router.push("/capture/meta");
